@@ -3,7 +3,7 @@ package dev.saberlabs.model;
 /**
  * Represents a customer order with a coffee, customer name, and computed price.
  */
-public class Order {
+public class Order implements CloneableOrder {
 
     private final String customerName;
     private final Coffee coffee;
@@ -45,5 +45,15 @@ public class Order {
     public String toString() {
         return String.format("Order[customer=%s, coffee=%s, price=$%.2f, status=%s]",
                 customerName, coffee.getDescription(), finalPrice, status);
+    }
+
+    @Override
+    public Order cloneOrder() {
+        return new Order(this.customerName, this.coffee.cloneCoffee());
+    }
+
+    // Overloaded method to clone order with a new customer name
+    public Order cloneOrder(String newCustomerName) {
+        return new Order(newCustomerName, this.coffee.cloneCoffee());
     }
 }

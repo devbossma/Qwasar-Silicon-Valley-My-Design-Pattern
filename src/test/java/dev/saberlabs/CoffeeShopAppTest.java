@@ -161,4 +161,63 @@ class CoffeeShopAppTest {
         }
     }
 
+    // =================================================================
+    // 4. Prototype
+    // =================================================================
+
+    @Nested
+    @DisplayName("4. Prototype Pattern")
+    class PrototypeTests {
+        @Test
+        @DisplayName("clone a coffee without extras")
+        void CloneCoffeeWithoutExtras() {
+            Coffee original = new MilkDecorator(new Espresso());
+            Coffee clonedCoffee = original.cloneCoffee();
+
+            assertNotSame(original, clonedCoffee);
+        }
+
+        @Test
+        @DisplayName("clone a coffee with multiple decorators")
+        void CloneCoffeeWithMultipleDecorators() {
+            Coffee original = new WhippedCreamDecorator(
+                    new MilkDecorator(
+                            new SugarDecorator(new Espresso())));
+            Coffee clonedCoffee = original.cloneCoffee();
+            assertNotSame(original, clonedCoffee);
+        }
+
+        @Test
+        @DisplayName("modifying the clone does not affect the original")
+        void modifyingCloneDoesNotAffectOriginal() {
+            Coffee original = new MilkDecorator(new Espresso());
+            Coffee clonedCoffee = original.cloneCoffee();
+            // Add sugar to the clone
+            clonedCoffee = new SugarDecorator(clonedCoffee);
+
+            assertNotSame(original, clonedCoffee);
+        }
+
+        @Test
+        @DisplayName("Clone Order for the same customer")
+        void cloneOrderForTheSameCustomer() {
+            Coffee originalCoffee = new MilkDecorator(new Espresso());
+            Order originalOrder = new Order("Yassine", originalCoffee);
+            Order clonedOrder = originalOrder.cloneOrder();
+
+            assertSame(originalOrder.getCustomerName(), clonedOrder.getCustomerName());
+            assertEquals(originalOrder.getCoffee().getDescription(), clonedOrder.getCoffee().getDescription());
+        }
+
+        @Test
+        @DisplayName("Clone Order for a different customer same coffee")
+        void cloneOrderForDifferentCustomer() {
+            Coffee original = new MilkDecorator(new Espresso());
+            Order originalOrder = new Order("Yassine", original);
+            Order clonedOrder = originalOrder.cloneOrder("Ahmed");
+
+            assertNotSame(originalOrder.getCustomerName(), clonedOrder.getCustomerName());
+            assertEquals(originalOrder.getCoffee().getDescription(), clonedOrder.getCoffee().getDescription());
+        }
+    }
 }

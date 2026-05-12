@@ -26,7 +26,7 @@ public class SugarDecorator extends CoffeeDecorator {
     }
 
     @Override
-    public Coffee cloneOrder() {
-        return new SugarDecorator(decoratedCoffee.cloneOrder());
+    public Coffee cloneCoffee() {
+        return new SugarDecorator(decoratedCoffee.cloneCoffee());
     }
 }

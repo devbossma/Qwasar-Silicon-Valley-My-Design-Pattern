@@ -17,12 +17,12 @@ public class Espresso implements Coffee {
     }
 
     @Override
-    public Coffee cloneOrder() {
-        return new Espresso();
+    public String toString() {
+        return getDescription() + " ($" + String.format("%.2f", getCost()) + ")";
     }
 
     @Override
-    public String toString() {
-        return getDescription() + " ($" + String.format("%.2f", getCost()) + ")";
+    public Coffee cloneCoffee() {
+        return new Espresso();
     }
 }

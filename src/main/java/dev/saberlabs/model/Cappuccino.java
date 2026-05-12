@@ -16,7 +16,7 @@ public class Cappuccino implements Coffee {
     }
 
     @Override
-    public Coffee cloneOrder() {
+    public Coffee cloneCoffee() {
         return new Cappuccino();
     }
 

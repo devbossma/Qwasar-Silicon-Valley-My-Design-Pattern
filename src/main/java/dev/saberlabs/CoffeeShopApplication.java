@@ -1,18 +1,33 @@
 package dev.saberlabs;
 
+
 import dev.saberlabs.decorator.MilkDecorator;
 import dev.saberlabs.decorator.SugarDecorator;
 import dev.saberlabs.decorator.WhippedCreamDecorator;
 import dev.saberlabs.factory.CappuccinoCreator;
 import dev.saberlabs.factory.CoffeeCreator;
+import dev.saberlabs.factory.EspressoCreator;
 import dev.saberlabs.factory.LatteCreator;
 import dev.saberlabs.model.Coffee;
+import dev.saberlabs.model.Customer;
 import dev.saberlabs.model.Order;
 import dev.saberlabs.singleton.CoffeeShop;
+import dev.saberlabs.template.CappuccinoPreparation;
+import dev.saberlabs.template.CoffeePreparationTemplate;
+import dev.saberlabs.template.LattePreparation;
 
 public class CoffeeShopApplication {
     static void main() {
         System.out.println("=== COFFEE SHOP — DESIGN PATTERNS DEMO ===\n");
+
+
+        // ---------------------------------------------------------------
+        // 0. CUSTOMER — create customers
+        // ---------------------------------------------------------------
+
+        Customer yassine = new Customer("C001", "Yassine");
+        Customer saber = new Customer("C002", "Saber");
+        Customer ahmed = new Customer("C003", "Ahmed");
 
         // ---------------------------------------------------------------
         // 1. SINGLETON — single CoffeeShop instance
@@ -43,8 +58,8 @@ public class CoffeeShopApplication {
         System.out.printf("FACTORY: Created %s and %s%n%n", cappuccino, latte);
 
         // Ordering A Cappuccino using the factory method's common logic
-        Order yassine_order = new Order("Yassine", cappuccino);
-        Order saber_order = new Order("Saber", latte);
+        Order yassine_order = new Order(yassine, cappuccino);
+        Order saber_order = new Order(saber, latte);
         shop.placeOrder(yassine_order);
         shop.placeOrder(saber_order);
         orderCount = shop.getOrders().size();
@@ -71,9 +86,9 @@ public class CoffeeShopApplication {
         System.out.println("---------------------------------------------------------------");
 
 
-        Order yassineOrder = new Order("Yassine", fancyCoffee); // Using A Decorated Coffe
-        Order clonedOrder = yassineOrder.cloneOrder("Ahmed");
-        System.out.printf("PROTOTYPE: Yassine's Cloned order for %s%n%n", clonedOrder.getCustomerName());
+        Order yassineOrder = new Order(yassine, fancyCoffee); // Using A Decorated Coffe
+        Order clonedOrder = yassineOrder.cloneOrder(ahmed);
+        System.out.printf("PROTOTYPE: Yassine's Cloned order for %s%n%n", clonedOrder.getCustomer().getName());
         System.out.println("Ahmed's Coffee description: " + clonedOrder.getCoffee().getDescription());
         System.out.println("Ahmed's Coffee cost: $" + clonedOrder.getCoffee().getCost());
 
@@ -81,7 +96,54 @@ public class CoffeeShopApplication {
         orderCount = shop.getOrders().size();
         System.out.println("SINGLETON: Total orders placed: " + orderCount);
 
+
+        // ---------------------------------------------------------------
+        // 5. Template Method
+        // ---------------------------------------------------------------
+        System.out.println("---------------------------------------------------------------");
+        System.out.println("5. Template Method - Preparing Coffee");
+        System.out.println("---------------------------------------------------------------");
+
+        CoffeePreparationTemplate cappuccinoPreparation = new CappuccinoPreparation();
+        cappuccinoPreparation.prepareCoffee();
+
+        CoffeePreparationTemplate lattePreparation = new LattePreparation();
+        lattePreparation.prepareCoffee();
+
+        // ---------------------------------------------------------------
+        // 6. STRATEGY — different pricing strategies based on customer loyalty tiers
+        // ---------------------------------------------------------------
+
+        Customer loyalCustomer = new Customer("C004", "Loyal Customer");
+        System.out.println("---------------------------------------------------------------");
+        System.out.println("6. STRATEGY — different pricing strategies");
+        System.out.println("------------------------------------------------------------");
+
+
+        Coffee decoratedEspresso = new SugarDecorator(new MilkDecorator(new EspressoCreator().createCoffee())); // Decorate the coffee with extras
+        Order loyalOrder = new Order(loyalCustomer, decoratedEspresso);
+        shop.placeOrder(loyalOrder);
+        System.out.printf("STRATEGY: %s ordered %s at price $%.2f with loyalty tier %s%n%n",
+                loyalOrder.getCustomer().getName(),
+                loyalOrder.getCoffee().getDescription(),
+                loyalOrder.getFinalPrice(),
+                loyalOrder.getCustomer().getLoyaltyTier());
+        for (int i = 0; i < 6; i++) {
+            shop.placeOrder(new Order(loyalCustomer, decoratedEspresso));
+            // Simulate order fulfillment to increment loyalty
+            loyalOrder.setStatus("READY");
+            loyalOrder.setFulfilled(true);
+            loyalCustomer.incrementOrders();
+        }
+        System.out.println("After placing more orders, " + loyalCustomer.getName() + " is now in loyalty tier: " + loyalCustomer.getLoyaltyTier());
+        for (int i = 0; i < 5; i++) {
+            shop.placeOrder(new Order(loyalCustomer, decoratedEspresso));
+
+            // Simulate order fulfillment to increment loyalty
+            loyalOrder.setStatus("READY");
+            loyalOrder.setFulfilled(true);
+            loyalCustomer.incrementOrders();
+        }
+        System.out.println("After placing more orders, " + loyalCustomer.getName() + " is now in loyalty tier: " + loyalCustomer.getLoyaltyTier());
     }
-
-
 }

@@ -1,5 +1,7 @@
 package dev.saberlabs.model;
 
+import dev.saberlabs.prototype.CloneableCoffee;
+
 /**
  * Base interface for all coffee types.
  * Serves as the Component in the Decorator pattern and

@@ -7,7 +7,8 @@ import dev.saberlabs.factory.CappuccinoCreator;
 import dev.saberlabs.factory.CoffeeCreator;
 import dev.saberlabs.factory.EspressoCreator;
 import dev.saberlabs.factory.LatteCreator;
-import dev.saberlabs.model.*;
+import dev.saberlabs.models.*;
+import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
 import dev.saberlabs.strategy.GoldMemberPricing;
 import dev.saberlabs.strategy.RegularPricing;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -462,6 +464,144 @@ class CoffeeShopAppTest {
             assertEquals(3.25 * 0.80, order.getFinalPrice(), 0.001);
         }
 
+    }
+
+    // =================================================================
+    // 7. OBSERVER
+    // =================================================================
+    @Nested
+    @DisplayName("7. Observer Pattern")
+    class ObserverTests {
+
+        /**
+         * A test spy observer that records every notification it receives.
+         */
+        static class SpyObserver implements OrderObserver {
+            final List<OrderStatus> receivedEvents = new ArrayList<>();
+            final List<Order> receivedOrders = new ArrayList<>();
+
+            @Override
+            public void update(Order order, OrderStatus event) {
+                receivedOrders.add(order);
+                receivedEvents.add(event);
+            }
+        }
+
+        @BeforeEach
+        void setUp() {
+            CoffeeShop.getInstance().clearOrders();
+        }
+
+        @Test
+        @DisplayName("registered observer receives notification when order is placed")
+        void observerReceivesPlacedEvent() {
+            CoffeeShop shop = CoffeeShop.getInstance();
+            SpyObserver spy = new SpyObserver();
+            shop.registerObserver(spy);
+
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+            shop.placeOrder(order);
+
+            assertEquals(1, spy.receivedEvents.size());
+            assertEquals(OrderStatus.PLACED, spy.receivedEvents.getFirst());
+            assertSame(order, spy.receivedOrders.getFirst());
+        }
+
+        @Test
+        @DisplayName("observer receives events for each status change")
+        void observerReceivesAllStatusChanges() {
+            CoffeeShop shop = CoffeeShop.getInstance();
+            SpyObserver spy = new SpyObserver();
+            shop.registerObserver(spy);
+
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+            shop.placeOrder(order);
+            order.setStatus(OrderStatus.READY);
+            order.setStatus(OrderStatus.FULFILLED);
+
+            assertEquals(3, spy.receivedEvents.size());
+            assertEquals(OrderStatus.PLACED, spy.receivedEvents.get(0));
+            assertEquals(OrderStatus.READY, spy.receivedEvents.get(1));
+            assertEquals(OrderStatus.FULFILLED, spy.receivedEvents.get(2));
+        }
+
+        @Test
+        @DisplayName("multiple observers all receive the same notification")
+        void multipleObserversAllNotified() {
+            CoffeeShop shop = CoffeeShop.getInstance();
+            SpyObserver spy1 = new SpyObserver();
+            SpyObserver spy2 = new SpyObserver();
+            shop.registerObserver(spy1);
+            shop.registerObserver(spy2);
+
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+            shop.placeOrder(order);
+
+            assertEquals(1, spy1.receivedEvents.size());
+            assertEquals(1, spy2.receivedEvents.size());
+            assertEquals(OrderStatus.PLACED, spy1.receivedEvents.getFirst());
+            assertEquals(OrderStatus.PLACED, spy2.receivedEvents.getFirst());
+        }
+
+        @Test
+        @DisplayName("removed observer stops receiving notifications")
+        void removedObserverReceivesNothing() {
+            CoffeeShop shop = CoffeeShop.getInstance();
+            SpyObserver spy = new SpyObserver();
+            shop.registerObserver(spy);
+            shop.removeObserver(spy);
+
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+            shop.placeOrder(order);
+
+            assertEquals(0, spy.receivedEvents.size());
+        }
+
+        @Test
+        @DisplayName("observer receives correct order reference")
+        void observerReceivesCorrectOrder() {
+            CoffeeShop shop = CoffeeShop.getInstance();
+            SpyObserver spy = new SpyObserver();
+            shop.registerObserver(spy);
+
+            Customer alice = new Customer("C001", "Alice");
+            Customer bob = new Customer("C002", "Bob");
+            Order aliceOrder = new Order(alice, new Espresso());
+            Order bobOrder = new Order(bob, new Cappuccino());
+
+            shop.placeOrder(aliceOrder);
+            shop.placeOrder(bobOrder);
+
+            assertEquals(2, spy.receivedOrders.size());
+            assertSame(aliceOrder, spy.receivedOrders.get(0));
+            assertSame(bobOrder, spy.receivedOrders.get(1));
+        }
+
+        @Test
+        @DisplayName("Customer as observer only reacts to own orders")
+        void customerOnlyReactsToOwnOrders() {
+            CoffeeShop shop = CoffeeShop.getInstance();
+            Customer alice = new Customer("C001", "Alice");
+            Customer bob = new Customer("C002", "Bob");
+            SpyObserver spy = new SpyObserver();
+
+            shop.registerObserver(alice);
+            shop.registerObserver(bob);
+            shop.registerObserver(spy);
+
+            Order bobOrder = new Order(bob, new Espresso());
+            shop.placeOrder(bobOrder);
+
+
+            // Both received the notification (observer layer works),
+            // but only Bob acted on it (business logic filtering)
+            assertSame(bob, spy.receivedOrders.getFirst().getCustomer());
+            assertNotSame(alice, spy.receivedOrders.getFirst().getCustomer());
+        }
     }
 
 }

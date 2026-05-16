@@ -1,6 +1,6 @@
 package dev.saberlabs.factory;
 
-import dev.saberlabs.model.Coffee;
+import dev.saberlabs.models.Coffee;
 
 /**
  * Pattern 2: FACTORY METHOD (Abstract Creator)

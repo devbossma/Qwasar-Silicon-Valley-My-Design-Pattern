@@ -1,6 +1,6 @@
 package dev.saberlabs.prototype;
 
-import dev.saberlabs.model.Order;
+import dev.saberlabs.models.Order;
 
 public interface CloneableOrder extends Cloneable {
     /**

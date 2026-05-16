@@ -1,6 +1,6 @@
 package dev.saberlabs.prototype;
 
-import dev.saberlabs.model.Coffee;
+import dev.saberlabs.models.Coffee;
 
 public interface CloneableCoffee extends Cloneable {
     /**

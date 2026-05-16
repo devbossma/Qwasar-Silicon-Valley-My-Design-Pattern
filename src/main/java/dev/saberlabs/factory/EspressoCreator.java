@@ -1,8 +1,8 @@
 package dev.saberlabs.factory;
 
 
-import dev.saberlabs.model.Coffee;
-import dev.saberlabs.model.Espresso;
+import dev.saberlabs.models.Coffee;
+import dev.saberlabs.models.Espresso;
 
 public class EspressoCreator extends CoffeeCreator {
 

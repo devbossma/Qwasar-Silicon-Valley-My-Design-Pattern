@@ -8,9 +8,8 @@ import dev.saberlabs.factory.CappuccinoCreator;
 import dev.saberlabs.factory.CoffeeCreator;
 import dev.saberlabs.factory.EspressoCreator;
 import dev.saberlabs.factory.LatteCreator;
-import dev.saberlabs.model.Coffee;
-import dev.saberlabs.model.Customer;
-import dev.saberlabs.model.Order;
+import dev.saberlabs.models.*;
+import dev.saberlabs.observer.OrderNotificationService;
 import dev.saberlabs.singleton.CoffeeShop;
 import dev.saberlabs.template.CappuccinoPreparation;
 import dev.saberlabs.template.CoffeePreparationTemplate;
@@ -131,8 +130,7 @@ public class CoffeeShopApplication {
         for (int i = 0; i < 6; i++) {
             shop.placeOrder(new Order(loyalCustomer, decoratedEspresso));
             // Simulate order fulfillment to increment loyalty
-            loyalOrder.setStatus("READY");
-            loyalOrder.setFulfilled(true);
+            loyalOrder.setStatus(OrderStatus.FULFILLED);
             loyalCustomer.incrementOrders();
         }
         System.out.println("After placing more orders, " + loyalCustomer.getName() + " is now in loyalty tier: " + loyalCustomer.getLoyaltyTier());
@@ -140,10 +138,41 @@ public class CoffeeShopApplication {
             shop.placeOrder(new Order(loyalCustomer, decoratedEspresso));
 
             // Simulate order fulfillment to increment loyalty
-            loyalOrder.setStatus("READY");
-            loyalOrder.setFulfilled(true);
+            loyalOrder.setStatus(OrderStatus.FULFILLED);
             loyalCustomer.incrementOrders();
         }
         System.out.println("After placing more orders, " + loyalCustomer.getName() + " is now in loyalty tier: " + loyalCustomer.getLoyaltyTier());
+
+        // ---------------------------------------------------------------
+        // 7. OBSERVER — subscribe customers for notifications
+        // ---------------------------------------------------------------
+        System.out.println("---------------------------------------------------------------");
+        System.out.println("7. OBSERVER — subscribe customers for notifications");
+        System.out.println("---------------------------------------------------------------");
+
+        Customer c1 = new Customer("C004", "Loyal Customer 1");
+        Customer c2 = new Customer("C005", "Loyal Customer 2");
+        Coffee coffee = new Cappuccino();
+        Order o1 = new Order(c1, coffee);
+        Order o2 = o1.cloneOrder(c2);
+
+        shop.registerObserver(c1); // Register the loyal customer as an observer
+        shop.registerObserver(c2);
+
+
+        // Register the loyal customer as an observer
+        shop.placeOrder(o1);
+        shop.placeOrder(o2);
+
+        System.out.println(c1.getTotalOrders());
+        o1.setStatus(OrderStatus.READY);
+        o1.setStatus(OrderStatus.FULFILLED);
+
+
+        o2.setStatus(OrderStatus.READY);
+        o2.setStatus(OrderStatus.FULFILLED);
+
+
+        System.out.println("------------------------------------------------------------");
     }
 }

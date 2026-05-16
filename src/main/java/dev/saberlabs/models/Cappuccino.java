@@ -1,23 +1,23 @@
-package dev.saberlabs.model;
+package dev.saberlabs.models;
 
 /**
- * Concrete coffee: Latte.
+ * Concrete coffee: Cappuccino.
  */
-public class Latte implements Coffee {
+public class Cappuccino implements Coffee {
 
     @Override
     public String getDescription() {
-        return "Latte";
+        return "Cappuccino";
     }
 
     @Override
     public double getCost() {
-        return 4.00;
+        return 3.50;
     }
 
     @Override
     public Coffee cloneCoffee() {
-        return new Latte();
+        return new Cappuccino();
     }
 
     @Override

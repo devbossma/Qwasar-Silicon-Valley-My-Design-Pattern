@@ -1,10 +1,9 @@
 package dev.saberlabs.singleton;
 
-
-
-import dev.saberlabs.factory.CappuccinoCreator;
-import dev.saberlabs.factory.CoffeeCreator;
-import dev.saberlabs.model.Order;
+import dev.saberlabs.models.Order;
+import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.observer.OrderNotificationService;
+import dev.saberlabs.observer.OrderObserver;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,6 +22,9 @@ public class CoffeeShop {
 
     // List to store orders placed at the coffee shop
     private final List<Order> orders = new ArrayList<>();
+
+    // Shared notification service for all orders
+    private final OrderNotificationService notificationService = new OrderNotificationService();
 
     // private constructor prevents external instantiation
     private CoffeeShop() { }
@@ -50,9 +52,20 @@ public class CoffeeShop {
         return coffeeShop;
     }
 
-    public void placeOrder(Order  order) {
+    // Register an observer to receive order status notifications
+    public void registerObserver(OrderObserver observer) {
+        notificationService.registerObserver(observer);
+    }
+
+    // Remove an observer from receiving notifications
+    public void removeObserver(OrderObserver observer) {
+        notificationService.removeObserver(observer);
+    }
+
+    public void placeOrder(Order order) {
         orders.add(order);
-        System.out.println("[CoffeeShop] Order added: " + order);
+        System.out.println("[CoffeeShop] New Order Placed: " + order);
+        order.setStatus(OrderStatus.PLACED);
     }
 
     // Method to retrieve an unmodifiable list of current orders
@@ -70,5 +83,8 @@ public class CoffeeShop {
         return orders.size();
     }
 
-
+    // Expose the notification service for Order to use during status changes
+    public OrderNotificationService getNotificationService() {
+        return notificationService;
+    }
 }

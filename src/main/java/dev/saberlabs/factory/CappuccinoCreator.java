@@ -1,7 +1,7 @@
 package dev.saberlabs.factory;
 
-import dev.saberlabs.model.Coffee;
-import dev.saberlabs.model.Cappuccino;
+import dev.saberlabs.models.Coffee;
+import dev.saberlabs.models.Cappuccino;
 
 public class CappuccinoCreator extends CoffeeCreator {
     @Override

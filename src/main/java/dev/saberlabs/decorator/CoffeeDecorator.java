@@ -1,6 +1,6 @@
 package dev.saberlabs.decorator;
 
-import dev.saberlabs.model.Coffee;
+import dev.saberlabs.models.Coffee;
 
 /**
  * Pattern 3: DECORATOR (The Abstract Decorator)

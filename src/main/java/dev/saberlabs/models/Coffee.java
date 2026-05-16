@@ -1,4 +1,4 @@
-package dev.saberlabs.model;
+package dev.saberlabs.models;
 
 import dev.saberlabs.prototype.CloneableCoffee;
 

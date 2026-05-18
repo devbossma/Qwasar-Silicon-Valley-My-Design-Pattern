@@ -1,6 +1,7 @@
 package dev.saberlabs;
 
 
+import dev.saberlabs.command.*;
 import dev.saberlabs.decorator.MilkDecorator;
 import dev.saberlabs.decorator.SugarDecorator;
 import dev.saberlabs.decorator.WhippedCreamDecorator;
@@ -172,7 +173,23 @@ public class CoffeeShopApplication {
         o2.setStatus(OrderStatus.READY);
         o2.setStatus(OrderStatus.FULFILLED);
 
+        // ---------------------------------------------------------------
+        // 8 COMMAND - encapsulate order processing steps and support undo
+        // ---------------------------------------------------------------
+        System.out.println("---------------------------------------------------------------");
+        System.out.println("8 COMMAND — encapsulate order processing steps and support undo");
+        System.out.println("---------------------------------------------------------------");
 
-        System.out.println("------------------------------------------------------------");
+        OrderInvoker invoker = new OrderInvoker();
+        Customer john = new Customer("C006", "John");
+        Order order = new Order(john, coffee);
+
+        invoker.executeCommand(new PlaceOrderCommand(order));    // PLACED + notification
+        invoker.executeCommand(new PrepareOrderCommand(order));  // READY + notification
+        invoker.executeCommand(new PayOrderCommand(order));      // payment collected
+        invoker.executeCommand(new FulfillOrderCommand(order));  // FULFILLED + tier increment
+
+        // Oops, undo the fulfillment
+//        invoker.undoLastCommand();
     }
 }

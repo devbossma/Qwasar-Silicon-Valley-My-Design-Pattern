@@ -1,6 +1,5 @@
 package dev.saberlabs;
 
-import dev.saberlabs.command.*;
 import dev.saberlabs.decorator.*;
 import dev.saberlabs.factory.*;
 import dev.saberlabs.models.*;
@@ -8,6 +7,9 @@ import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
 import dev.saberlabs.strategy.*;
 import dev.saberlabs.template.*;
+import dev.saberlabs.adapter.*;
+import dev.saberlabs.command.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -650,11 +652,13 @@ class CoffeeShopAppTest {
         @DisplayName("PayOrderCommand collects payment")
         void payOrderCommand() {
             Customer alice = new Customer("C001", "Alice");
+            StripePaymentService stripeService = new StripePaymentService("1234567890123456", "Bob Smith", "12", "2028", "456");
+            PaymentGateway alicePayment = new StripeAdapter(stripeService);
             Order order = new Order(alice, new Espresso());
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
-            invoker.executeCommand(new PayOrderCommand(order));
+            invoker.executeCommand(new PayOrderCommand(order, alicePayment));
 
             // No exception means payment processed successfully
             assertEquals(2, invoker.getCommandHistory().size());
@@ -744,14 +748,12 @@ class CoffeeShopAppTest {
 
             invoker.executeCommand(new PlaceOrderCommand(order));
             invoker.executeCommand(new PrepareOrderCommand(order));
-            invoker.executeCommand(new PayOrderCommand(order));
             invoker.executeCommand(new FulfillOrderCommand(order));
 
             List<Command> history = invoker.getCommandHistory();
-            assertEquals(4, history.size());
+            assertEquals(3, history.size());
             assertEquals("PlaceOrderCommand", history.get(0).getCommandName());
             assertEquals("PrepareOrderCommand", history.get(1).getCommandName());
-            assertEquals("PayOrderCommand", history.get(2).getCommandName());
             assertEquals("FulfillOrderCommand", history.get(3).getCommandName());
         }
 
@@ -785,12 +787,10 @@ class CoffeeShopAppTest {
             invoker.executeCommand(new PrepareOrderCommand(order));
             assertEquals(OrderStatus.READY, order.getStatus());
 
-            invoker.executeCommand(new PayOrderCommand(order));
-
             invoker.executeCommand(new FulfillOrderCommand(order));
             assertEquals(OrderStatus.FULFILLED, order.getStatus());
             assertEquals(1, alice.getTotalOrders());
-            assertEquals(4, invoker.getCommandHistory().size());
+            assertEquals(3, invoker.getCommandHistory().size());
         }
 
         @Test
@@ -810,6 +810,230 @@ class CoffeeShopAppTest {
             assertEquals(OrderStatus.READY, aliceOrder.getStatus());
             assertEquals(OrderStatus.READY, bobOrder.getStatus());
             assertEquals(4, invoker.getCommandHistory().size());
+        }
+    }
+
+    // =================================================================
+    // 9. ADAPTER
+    // =================================================================
+    @Nested
+    @DisplayName("9. Adapter Pattern")
+    class AdapterTests {
+
+        // ---- PayPal Adapter Tests ----
+
+        @Test
+        @DisplayName("PayPal adapter processes payment successfully")
+        void paypalProcessesPayment() {
+            PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "pass");
+            PaymentGateway gateway = new PayPalAdapter(paypalService);
+
+            boolean result = gateway.processPayment("ORDER-001", 5.00);
+
+            assertTrue(result);
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, gateway.getPaymentStatus("ORDER-001"));
+        }
+
+        @Test
+        @DisplayName("PayPal adapter fails on insufficient funds")
+        void paypalInsufficientFunds() {
+            PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "pass");
+            paypalService.setBalance(1.00);
+            PaymentGateway gateway = new PayPalAdapter(paypalService);
+
+            boolean result = gateway.processPayment("ORDER-001", 5.00);
+
+            assertFalse(result);
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("ORDER-001"));
+        }
+
+        @Test
+        @DisplayName("PayPal adapter converts dollars to cents correctly")
+        void paypalDollarToCentsConversion() {
+            PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "pass");
+            paypalService.setBalance(10.00);
+            PaymentGateway gateway = new PayPalAdapter(paypalService);
+
+            gateway.processPayment("ORDER-001", 3.75);
+
+            assertEquals(6.25, paypalService.getBalance(), 0.001);
+        }
+
+        @Test
+        @DisplayName("PayPal adapter tracks multiple transactions independently")
+        void paypalMultipleTransactions() {
+            PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "pass");
+            PaymentGateway gateway = new PayPalAdapter(paypalService);
+
+            gateway.processPayment("ORDER-001", 5.00);
+            paypalService.setBalance(0.50);
+            gateway.processPayment("ORDER-002", 10.00);
+
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, gateway.getPaymentStatus("ORDER-001"));
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("ORDER-002"));
+        }
+
+        @Test
+        @DisplayName("PayPal adapter Throws a RunTime exeption for non-existent order")
+        void paypalUnknownOrder() {
+            PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "pass");
+            PaymentGateway gateway = new PayPalAdapter(paypalService);
+
+            assertThrows(RuntimeException.class, () -> gateway.getPaymentStatus("UNKNOWN"));
+        }
+
+        // ---- Stripe Adapter Tests ----
+
+        @Test
+        @DisplayName("Stripe adapter processes payment successfully")
+        void stripeProcessesPayment() {
+            StripePaymentService stripeService = new StripePaymentService(
+                    "1234567890123456", "Bob Smith", "12", "2028", "456");
+            PaymentGateway gateway = new StripeAdapter(stripeService);
+
+            boolean result = gateway.processPayment("ORDER-001", 5.00);
+
+            assertTrue(result);
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, gateway.getPaymentStatus("ORDER-001"));
+        }
+
+        @Test
+        @DisplayName("Stripe adapter fails on insufficient funds")
+        void stripeInsufficientFunds() {
+            StripePaymentService stripeService = new StripePaymentService(
+                    "1234567890123456", "Bob Smith", "12", "2028", "456");
+            stripeService.setBalance(1.00);
+            PaymentGateway gateway = new StripeAdapter(stripeService);
+
+            boolean result = gateway.processPayment("ORDER-001", 5.00);
+
+            assertFalse(result);
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("ORDER-001"));
+        }
+
+        @Test
+        @DisplayName("Stripe adapter fails on invalid card number")
+        void stripeInvalidCardNumber() {
+            StripePaymentService stripeService = new StripePaymentService(
+                    "123", "Bob Smith", "12", "2028", "456");
+            PaymentGateway gateway = new StripeAdapter(stripeService);
+
+            boolean result = gateway.processPayment("ORDER-001", 5.00);
+
+            assertFalse(result);
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("ORDER-001"));
+        }
+
+        @Test
+        @DisplayName("Stripe adapter fails on expired card")
+        void stripeExpiredCard() {
+            StripePaymentService stripeService = new StripePaymentService(
+                    "1234567890123456", "Bob Smith", "01", "2020", "456");
+            PaymentGateway gateway = new StripeAdapter(stripeService);
+
+            boolean result = gateway.processPayment("ORDER-001", 5.00);
+
+            assertFalse(result);
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("ORDER-001"));
+        }
+
+        @Test
+        @DisplayName("Stripe adapter fails on invalid CVV")
+        void stripeInvalidCvv() {
+            StripePaymentService stripeService = new StripePaymentService(
+                    "1234567890123456", "Bob Smith", "12", "2028", "1");
+            PaymentGateway gateway = new StripeAdapter(stripeService);
+
+            boolean result = gateway.processPayment("ORDER-001", 5.00);
+
+            assertFalse(result);
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("ORDER-001"));
+        }
+
+        @Test
+        @DisplayName("Stripe adapter tracks multiple transactions independently")
+        void stripeMultipleTransactions() {
+            StripePaymentService stripeService = new StripePaymentService(
+                    "1234567890123456", "Bob Smith", "12", "2028", "456");
+            PaymentGateway gateway = new StripeAdapter(stripeService);
+
+            gateway.processPayment("ORDER-001", 5.00);
+            stripeService.setBalance(0.50);
+            gateway.processPayment("ORDER-002", 10.00);
+
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, gateway.getPaymentStatus("ORDER-001"));
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("ORDER-002"));
+        }
+
+        @Test
+        @DisplayName("Strip adapbter Throws a RunTime exeption for non-existent order")
+        void stripeUnknownOrder() {
+            StripePaymentService stripeService = new StripePaymentService(
+                    "1234567890123456", "Bob Smith", "12", "2028", "456");
+            PaymentGateway gateway = new StripeAdapter(stripeService);
+
+            assertThrows(RuntimeException.class, () -> gateway.getPaymentStatus("UNKNOWN"));
+        }
+
+        // ---- Adapter Interchangeability Tests ----
+
+        @Test
+        @DisplayName("both adapters work through the same PaymentGateway interface")
+        void adaptersAreInterchangeable() {
+            PaymentGateway paypal = new PayPalAdapter(
+                    new PayPalPaymentService("alice@mail.com", "pass"));
+            PaymentGateway stripe = new StripeAdapter(
+                    new StripePaymentService("1234567890123456", "Bob", "12", "2028", "456"));
+
+            // Same method, different providers
+            assertTrue(paypal.processPayment("ORDER-001", 3.50));
+            assertTrue(stripe.processPayment("ORDER-002", 4.25));
+
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, paypal.getPaymentStatus("ORDER-001"));
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, stripe.getPaymentStatus("ORDER-002"));
+        }
+
+        @Test
+        @DisplayName("PayOrderCommand works with PayPal adapter")
+        void payOrderCommandWithPayPal() {
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+            PaymentGateway paypal = new PayPalAdapter(
+                    new PayPalPaymentService("alice@mail.com", "pass"));
+
+            PayOrderCommand cmd = new PayOrderCommand(order, paypal);
+            cmd.execute();
+
+            assertTrue(cmd.isPaid());
+        }
+
+        @Test
+        @DisplayName("PayOrderCommand works with Stripe adapter")
+        void payOrderCommandWithStripe() {
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+            PaymentGateway stripe = new StripeAdapter(
+                    new StripePaymentService("1234567890123456", "Alice", "12", "2028", "456"));
+
+            PayOrderCommand cmd = new PayOrderCommand( order, stripe);
+            cmd.execute();
+
+            assertTrue(cmd.isPaid());
+        }
+
+        @Test
+        @DisplayName("PayOrderCommand throws on payment failure")
+        void payOrderCommandFailsOnInsufficientFunds() {
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+            PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "pass");
+            paypalService.setBalance(0.01);
+            PaymentGateway paypal = new PayPalAdapter(paypalService);
+
+            PayOrderCommand cmd = new PayOrderCommand(order, paypal);
+
+            assertThrows(RuntimeException.class, cmd::execute);
+            assertFalse(cmd.isPaid());
         }
     }
 

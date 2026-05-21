@@ -1,6 +1,7 @@
 package dev.saberlabs;
 
 
+import dev.saberlabs.adapter.*;
 import dev.saberlabs.command.*;
 import dev.saberlabs.decorator.MilkDecorator;
 import dev.saberlabs.decorator.SugarDecorator;
@@ -186,10 +187,54 @@ public class CoffeeShopApplication {
 
         invoker.executeCommand(new PlaceOrderCommand(order));    // PLACED + notification
         invoker.executeCommand(new PrepareOrderCommand(order));  // READY + notification
-        invoker.executeCommand(new PayOrderCommand(order));      // payment collected
         invoker.executeCommand(new FulfillOrderCommand(order));  // FULFILLED + tier increment
 
-        // Oops, undo the fulfillment
-//        invoker.undoLastCommand();
+        // ---------------------------------------------------------------
+        // 9 ADAPTER — provide a unified interface for different payment services
+        // ---------------------------------------------------------------
+        System.out.println("---------------------------------------------------------------");
+        System.out.println("9 ADAPTER — provide a unified interface for different payment services");
+        System.out.println("---------------------------------------------------------------");
+
+        // Alice pays with PayPal
+        PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "secret123");
+        PaymentGateway alicePayment = new PayPalAdapter(paypalService);
+
+        // Bob pays with Stripe
+        StripePaymentService stripeService = new StripePaymentService("1234567890123456", "Bob Smith", "12", "2028", "456");
+        PaymentGateway bobPayment = new StripeAdapter(stripeService);
+
+        // === Client code only sees PaymentGateway — doesn't know PayPal vs Stripe ===
+
+        Customer alice = new Customer("C001", "Alice");
+        Customer bob = new Customer("C002", "Bob");
+
+        Coffee aliceCoffee = new MilkDecorator(new Espresso());
+        Coffee bobCoffee = new WhippedCreamDecorator(new Cappuccino());
+
+        Order aliceOrder = new Order(alice, aliceCoffee);
+        Order bobOrder = new Order(bob, bobCoffee);
+
+        // Process payments through the same interface
+        String aliceOrderId = "ORDER-" + alice.getId();
+        String bobOrderId = "ORDER-" + bob.getId();
+
+        alicePayment.processPayment(aliceOrderId, aliceOrder.getFinalPrice()); // → PayPal internally
+        bobPayment.processPayment(bobOrderId, bobOrder.getFinalPrice());       // → Stripe internally
+
+        // Check status — same method, different providers
+//        System.out.println(alicePayment.getPaymentStatus("DOMY")); // Payment Exception simulation. since we are using a domy order id that does not exist in the PayPal service, it will throw an exception and return "PAYMENT_EXCEPTION"
+        System.out.println(alicePayment.getPaymentStatus(aliceOrderId)); // PAYMENT_COMPLETE
+        System.out.println(bobPayment.getPaymentStatus(bobOrderId));     // PAYMENT_COMPLETE
+
+
+        // === With Command pattern integration ===
+
+        OrderInvoker cmdInvoker = new OrderInvoker();
+
+        cmdInvoker.executeCommand(new PlaceOrderCommand(aliceOrder));
+        cmdInvoker.executeCommand(new PrepareOrderCommand(aliceOrder));
+        cmdInvoker.executeCommand(new PayOrderCommand(aliceOrder, alicePayment));  // Adapter plugs into Command
+        cmdInvoker.executeCommand(new FulfillOrderCommand(aliceOrder));
     }
 }

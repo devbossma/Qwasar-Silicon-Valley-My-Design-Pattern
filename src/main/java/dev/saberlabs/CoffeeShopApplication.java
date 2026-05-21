@@ -236,5 +236,37 @@ public class CoffeeShopApplication {
         cmdInvoker.executeCommand(new PrepareOrderCommand(aliceOrder));
         cmdInvoker.executeCommand(new PayOrderCommand(aliceOrder, alicePayment));  // Adapter plugs into Command
         cmdInvoker.executeCommand(new FulfillOrderCommand(aliceOrder));
+
+
+        // === CASH PAYMENT — CLIENT CODE EXAMPLE ===
+
+        shop.clearOrders();
+
+        // Setup: create customer and register as observer
+        Customer dana = new Customer("C001", "Dana");
+        shop.registerObserver(dana);
+
+        // Alice orders a decorated coffee
+        Coffee danaCoffee = new MilkDecorator(new SugarDecorator(new Espresso()));
+        Order danaOrder = new Order(dana, danaCoffee);
+
+        // Setup cash payment — cashier sees $3.25 due, customer hands over $5.00
+        CashPaymentService cashService = new CashPaymentService();
+        cashService.setAmountReceived(5.00);
+        PaymentGateway cashGateway = new CashPaymentAdapter(cashService);
+
+        // Process full lifecycle through commands
+        invoker.executeCommand(new PlaceOrderCommand(danaOrder));
+        invoker.executeCommand(new PrepareOrderCommand(danaOrder));
+        invoker.executeCommand(new PayOrderCommand(danaOrder, cashGateway));
+        invoker.executeCommand(new FulfillOrderCommand(danaOrder));
+
+        // Cashier gives change
+        double change = ((CashPaymentAdapter) cashGateway).getChange("ORDER-" + alice.getId());
+        System.out.printf("Change for Alice: $%.2f%n", change);
+
+        // Register total
+        System.out.printf("Cash register total: $%.2f%n", cashService.getCashRegisterTotal());
+
     }
 }

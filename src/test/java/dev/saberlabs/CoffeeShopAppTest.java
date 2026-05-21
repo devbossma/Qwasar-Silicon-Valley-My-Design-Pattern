@@ -222,7 +222,7 @@ class CoffeeShopAppTest {
         @Test
         @DisplayName("Clone Order for a different customer same coffee")
         void cloneOrderForDifferentCustomer() {
-            Customer customer = new Customer("C003", "Yassine");;
+            Customer customer = new Customer("C003", "Yassine");
             Coffee original = new MilkDecorator(new Espresso());
             Order originalOrder = new Order(customer, original);
             Order clonedOrder = originalOrder.cloneOrder(new Customer("C004", "Ahmed"));
@@ -754,7 +754,7 @@ class CoffeeShopAppTest {
             assertEquals(3, history.size());
             assertEquals("PlaceOrderCommand", history.get(0).getCommandName());
             assertEquals("PrepareOrderCommand", history.get(1).getCommandName());
-            assertEquals("FulfillOrderCommand", history.get(3).getCommandName());
+            assertEquals("FulfillOrderCommand", history.get(2).getCommandName());
         }
 
         @Test
@@ -966,7 +966,7 @@ class CoffeeShopAppTest {
         }
 
         @Test
-        @DisplayName("Strip adapbter Throws a RunTime exeption for non-existent order")
+        @DisplayName("Stripe adapter Throws a RunTime exception for non-existent order")
         void stripeUnknownOrder() {
             StripePaymentService stripeService = new StripePaymentService(
                     "1234567890123456", "Bob Smith", "12", "2028", "456");
@@ -1034,6 +1034,198 @@ class CoffeeShopAppTest {
 
             assertThrows(RuntimeException.class, cmd::execute);
             assertFalse(cmd.isPaid());
+        }
+
+
+        // ---- Cash Adapter Tests ----
+
+        @Test
+        @DisplayName("Cash adapter processes exact payment successfully")
+        void cashExactPayment() {
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(3.50);
+            PaymentGateway gateway = new CashPaymentAdapter(cashService);
+
+            boolean result = gateway.processPayment("ORDER-001", 3.50);
+
+            assertTrue(result);
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, gateway.getPaymentStatus("ORDER-001"));
+            assertEquals(3.50, cashService.getCashRegisterTotal(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Cash adapter calculates correct change on overpayment")
+        void cashOverpaymentChange() {
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(10.00);
+            CashPaymentAdapter adapter = new CashPaymentAdapter(cashService);
+
+            adapter.processPayment("ORDER-001", 3.50);
+
+            assertEquals(6.50, adapter.getChange("ORDER-001"), 0.001);
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, adapter.getPaymentStatus("ORDER-001"));
+            assertEquals(3.50, cashService.getCashRegisterTotal(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Cash adapter returns zero change for exact payment")
+        void cashExactPaymentZeroChange() {
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(3.50);
+            CashPaymentAdapter adapter = new CashPaymentAdapter(cashService);
+
+            adapter.processPayment("ORDER-001", 3.50);
+
+            assertEquals(0.00, adapter.getChange("ORDER-001"), 0.001);
+        }
+
+        @Test
+        @DisplayName("Cash adapter fails on insufficient cash")
+        void cashInsufficientPayment() {
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(2.00);
+            CashPaymentAdapter adapter = new CashPaymentAdapter(cashService);
+
+            boolean result = adapter.processPayment("ORDER-001", 5.00);
+
+            assertFalse(result);
+            assertEquals(PaymentStatus.PAYMENT_FAILED, adapter.getPaymentStatus("ORDER-001"));
+            assertEquals(0.00, adapter.getChange("ORDER-001"), 0.001);
+            assertEquals(0.00, cashService.getCashRegisterTotal(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Cash adapter tracks multiple transactions independently")
+        void cashMultipleTransactions() {
+            CashPaymentService cashService = new CashPaymentService();
+            CashPaymentAdapter adapter = new CashPaymentAdapter(cashService);
+
+            cashService.setAmountReceived(5.00);
+            adapter.processPayment("ORDER-001", 2.50);
+
+            cashService.setAmountReceived(10.00);
+            adapter.processPayment("ORDER-002", 4.00);
+
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, adapter.getPaymentStatus("ORDER-001"));
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, adapter.getPaymentStatus("ORDER-002"));
+            assertEquals(2.50, adapter.getChange("ORDER-001"), 0.001);
+            assertEquals(6.00, adapter.getChange("ORDER-002"), 0.001);
+            assertEquals(6.50, cashService.getCashRegisterTotal(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Cash adapter returns PAYMENT_FAILED for unknown order")
+        void cashUnknownOrder() {
+            CashPaymentService cashService = new CashPaymentService();
+            PaymentGateway gateway = new CashPaymentAdapter(cashService);
+
+            assertEquals(PaymentStatus.PAYMENT_FAILED, gateway.getPaymentStatus("UNKNOWN"));
+        }
+
+        @Test
+        @DisplayName("Cash adapter returns zero change for unknown order")
+        void cashUnknownOrderZeroChange() {
+            CashPaymentService cashService = new CashPaymentService();
+            CashPaymentAdapter adapter = new CashPaymentAdapter(cashService);
+
+            assertEquals(0.00, adapter.getChange("UNKNOWN"), 0.001);
+        }
+
+        @Test
+        @DisplayName("Cash adapter accumulates register total across transactions")
+        void cashRegisterAccumulates() {
+            CashPaymentService cashService = new CashPaymentService();
+            PaymentGateway gateway = new CashPaymentAdapter(cashService);
+
+            cashService.setAmountReceived(3.00);
+            gateway.processPayment("ORDER-001", 3.00);
+
+            cashService.setAmountReceived(4.50);
+            gateway.processPayment("ORDER-002", 4.50);
+
+            cashService.setAmountReceived(2.25);
+            gateway.processPayment("ORDER-003", 2.25);
+
+            assertEquals(9.75, cashService.getCashRegisterTotal(), 0.001);
+        }
+
+        @Test
+        @DisplayName("Cash adapter is interchangeable with PayPal and Stripe")
+        void cashInterchangeableWithOtherAdapters() {
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(5.00);
+
+            PaymentGateway paypal = new PayPalAdapter(
+                    new PayPalPaymentService("alice@mail.com", "pass"));
+            PaymentGateway stripe = new StripeAdapter(
+                    new StripePaymentService("1234567890123456", "Bob", "12", "2028", "456"));
+            PaymentGateway cash = new CashPaymentAdapter(cashService);
+
+            assertTrue(paypal.processPayment("ORDER-001", 3.50));
+            assertTrue(stripe.processPayment("ORDER-002", 4.25));
+            assertTrue(cash.processPayment("ORDER-003", 2.75));
+
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, paypal.getPaymentStatus("ORDER-001"));
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, stripe.getPaymentStatus("ORDER-002"));
+            assertEquals(PaymentStatus.PAYMENT_COMPLETE, cash.getPaymentStatus("ORDER-003"));
+        }
+
+        @Test
+        @DisplayName("PayOrderCommand works with Cash adapter")
+        void payOrderCommandWithCash() {
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(10.00);
+            PaymentGateway cashGateway = new CashPaymentAdapter(cashService);
+
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso());
+
+            PayOrderCommand cmd = new PayOrderCommand(order, cashGateway);
+            cmd.execute();
+
+            assertTrue(cmd.isPaid());
+        }
+
+        @Test
+        @DisplayName("PayOrderCommand fails with Cash adapter on insufficient cash")
+        void payOrderCommandFailsWithInsufficientCash() {
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(0.50);
+            PaymentGateway cashGateway = new CashPaymentAdapter(cashService);
+
+            Customer alice = new Customer("C001", "Alice");
+            Order order = new Order(alice, new Espresso()); // $2.50
+
+            PayOrderCommand cmd = new PayOrderCommand(order, cashGateway);
+
+            assertThrows(RuntimeException.class, cmd::execute);
+            assertFalse(cmd.isPaid());
+        }
+
+        @Test
+        @DisplayName("Full lifecycle with cash payment through commands")
+        void fullLifecycleWithCashPayment() {
+            CoffeeShop shop = CoffeeShop.getInstance();
+            Customer alice = new Customer("C001", "Alice");
+            shop.registerObserver(alice);
+
+            Coffee coffee = new MilkDecorator(new Espresso()); // $3.00
+            Order order = new Order(alice, coffee);
+
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(5.00);
+            PaymentGateway cashGateway = new CashPaymentAdapter(cashService);
+
+            OrderInvoker invoker = new OrderInvoker();
+            invoker.executeCommand(new PlaceOrderCommand(order));
+            invoker.executeCommand(new PrepareOrderCommand(order));
+            invoker.executeCommand(new PayOrderCommand(order, cashGateway));
+            invoker.executeCommand(new FulfillOrderCommand(order));
+
+            assertEquals(OrderStatus.FULFILLED, order.getStatus());
+            assertEquals(1, alice.getTotalOrders());
+            assertEquals(4, invoker.getCommandHistory().size());
+            assertEquals(order.getFinalPrice(), cashService.getCashRegisterTotal(), 0.001);
         }
     }
 

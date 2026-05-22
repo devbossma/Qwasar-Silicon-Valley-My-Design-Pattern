@@ -1,6 +1,7 @@
 package dev.saberlabs.models;
 
 import dev.saberlabs.prototype.CloneableCoffee;
+import dev.saberlabs.template.CoffeePreparationTemplate;
 
 /**
  * Base interface for all coffee types.
@@ -14,4 +15,7 @@ public interface Coffee extends CloneableCoffee {
 
     // Returns the cost of the coffee, including any added ingredients cost (Decorators cost).
     double getCost();
+
+    // Returns the preparation template associated with this coffee type, which defines the steps to prepare it.
+    CoffeePreparationTemplate getPreparation();
 }

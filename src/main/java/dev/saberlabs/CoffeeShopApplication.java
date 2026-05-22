@@ -240,15 +240,17 @@ public class CoffeeShopApplication {
 
         // === CASH PAYMENT — CLIENT CODE EXAMPLE ===
 
+        System.out.println("\n=== CASH PAYMENT — CLIENT CODE EXAMPLE ===");
+
         shop.clearOrders();
+        System.out.println("Order Count: " + shop.getOrderCount());
 
         // Setup: create customer and register as observer
-        Customer dana = new Customer("C001", "Dana");
-        shop.registerObserver(dana);
+        Customer dany = new Customer("C000123", "Dany");
 
-        // Alice orders a decorated coffee
-        Coffee danaCoffee = new MilkDecorator(new SugarDecorator(new Espresso()));
-        Order danaOrder = new Order(dana, danaCoffee);
+        // Dana orders a decorated coffee
+        Coffee danyCoffee = new MilkDecorator(new SugarDecorator(new Espresso()));
+        Order danyOrder = new Order(dany, danyCoffee);;
 
         // Setup cash payment — cashier sees $3.25 due, customer hands over $5.00
         CashPaymentService cashService = new CashPaymentService();
@@ -256,13 +258,15 @@ public class CoffeeShopApplication {
         PaymentGateway cashGateway = new CashPaymentAdapter(cashService);
 
         // Process full lifecycle through commands
-        invoker.executeCommand(new PlaceOrderCommand(danaOrder));
-        invoker.executeCommand(new PrepareOrderCommand(danaOrder));
-        invoker.executeCommand(new PayOrderCommand(danaOrder, cashGateway));
-        invoker.executeCommand(new FulfillOrderCommand(danaOrder));
+        OrderInvoker cmd = new OrderInvoker();
+
+        cmd.executeCommand(new PlaceOrderCommand(danyOrder));
+        cmd.executeCommand(new PrepareOrderCommand(danyOrder));
+        cmd.executeCommand(new PayOrderCommand(danyOrder, cashGateway));
+        cmd.executeCommand(new FulfillOrderCommand(danyOrder));
 
         // Cashier gives change
-        double change = ((CashPaymentAdapter) cashGateway).getChange("ORDER-" + alice.getId());
+        double change = ((CashPaymentAdapter) cashGateway).getChange("ORDER-" + dany.getId());
         System.out.printf("Change for Alice: $%.2f%n", change);
 
         // Register total

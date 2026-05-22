@@ -3,6 +3,7 @@ package dev.saberlabs.command;
 
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.singleton.CoffeeShop;
 
 /**
  * Pattern 8: COMMAND (Concrete Command)
@@ -24,6 +25,7 @@ public class PrepareOrderCommand implements Command {
         previousStatus = order.getStatus();
         System.out.println("["+getCommandName()+"]  Preparing \"" + order.getCoffee().getDescription() + "\" For "+ order.getCustomer().getName()+"! ...");
         order.setStatus(OrderStatus.PREPARING);
+        order.getCoffee().getPreparation().prepareCoffee();
         System.out.println("["+getCommandName()+"] Order is being prepared: " + order);
         order.setStatus(OrderStatus.READY);
     }
@@ -31,6 +33,7 @@ public class PrepareOrderCommand implements Command {
     @Override
     public void undo() {
         order.setStatus(previousStatus);
+        CoffeeShop.getInstance().removeObserver(order.getCustomer());
         System.out.println("["+getCommandName()+"] Reverted to: " + previousStatus);
     }
 

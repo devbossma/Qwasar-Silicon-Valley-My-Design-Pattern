@@ -1,6 +1,7 @@
 package dev.saberlabs.decorator;
 
 import dev.saberlabs.models.Coffee;
+import dev.saberlabs.template.CoffeePreparationTemplate;
 
 /**
  * Pattern 3: DECORATOR (The Abstract Decorator)
@@ -25,5 +26,10 @@ public abstract class CoffeeDecorator implements Coffee {
     @Override
     public double getCost() {
         return decoratedCoffee.getCost();
+    }
+
+    @Override
+    public CoffeePreparationTemplate getPreparation() {
+        return decoratedCoffee.getPreparation();
     }
 }

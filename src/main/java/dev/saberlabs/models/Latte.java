@@ -1,5 +1,8 @@
 package dev.saberlabs.models;
 
+import dev.saberlabs.template.CoffeePreparationTemplate;
+import dev.saberlabs.template.LattePreparation;
+
 /**
  * Concrete coffee: Latte.
  */
@@ -23,5 +26,10 @@ public class Latte implements Coffee {
     @Override
     public String toString() {
         return getDescription() + " ($" + String.format("%.2f", getCost()) + ")";
+    }
+
+    @Override
+    public CoffeePreparationTemplate getPreparation() {
+        return new LattePreparation();
     }
 }

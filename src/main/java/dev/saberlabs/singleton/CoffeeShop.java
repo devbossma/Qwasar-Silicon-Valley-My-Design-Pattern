@@ -8,6 +8,7 @@ import dev.saberlabs.observer.OrderObserver;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Pattern 1: SINGLETON
@@ -22,6 +23,9 @@ public class CoffeeShop {
 
     // List to store orders placed at the coffee shop
     private final List<Order> orders = new ArrayList<>();
+
+    // AtomicInteger to generate unique command IDs for orders, ensuring thread safety when multiple threads are placing orders simultaneously.
+    private final AtomicInteger commandIdCounter = new AtomicInteger(0);
 
     // Shared notification service for all orders
     private final OrderNotificationService notificationService = new OrderNotificationService();
@@ -86,5 +90,18 @@ public class CoffeeShop {
     // Expose the notification service for Order to use during status changes
     public OrderNotificationService getNotificationService() {
         return notificationService;
+    }
+
+    /**
+     * Generates the next unique command ID.
+     *
+     * @return the next command ID
+     */
+    public int nextOrderId() {
+        return commandIdCounter.incrementAndGet();
+    }
+
+    public String nextCustomerId() {
+        return "Customer-" + commandIdCounter.incrementAndGet();
     }
 }

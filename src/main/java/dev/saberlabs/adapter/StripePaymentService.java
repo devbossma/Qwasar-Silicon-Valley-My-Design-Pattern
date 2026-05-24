@@ -2,6 +2,12 @@ package dev.saberlabs.adapter;
 
 import java.time.LocalDate;
 
+/**
+ * Pattern 9: ADAPTER (Class Adaptee)
+ *
+ * Simulates a Stripe payment gateway with an incompatible API.
+ * It uses "cents" and a different method signature than our system expects.
+ */
 public class StripePaymentService {
 
     private final String cardNumber;
@@ -11,7 +17,7 @@ public class StripePaymentService {
     private final String cvv;
 
     // For testing purposes, we simulate a balance to track charges. In a real implementation, this would be managed by Stripe's API.
-    private double balance = 100_000.00; // Simulated balance for testing purposes.
+    private double balance = 100000.00; // Simulated balance for testing purposes, The Stripe API would handle this in a real implementation.
 
 
 
@@ -59,7 +65,7 @@ public class StripePaymentService {
 
         // Card is valid if expiration is in the future
         boolean isNotExpired = (expYear > currentYear)
-                || (expYear == currentYear && expMonth >= currentMonth);
+                || (expYear == currentYear && expMonth > currentMonth);
 
         return isCardNumberValid
                 && isNotExpired

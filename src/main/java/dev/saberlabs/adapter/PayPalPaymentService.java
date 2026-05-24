@@ -2,7 +2,7 @@ package dev.saberlabs.adapter;
 
 
 /**
- * Pattern 9: ADAPTER (Adaptee)
+ * Pattern 9: ADAPTER (Class Adaptee)
  *
  * Simulates a PayPal payment gateway with an incompatible API.
  * It uses "cents" and a different method signature than our system expects.

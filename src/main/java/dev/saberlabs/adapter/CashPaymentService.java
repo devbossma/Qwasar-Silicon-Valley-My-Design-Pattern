@@ -1,5 +1,7 @@
 package dev.saberlabs.adapter;
 
+import java.util.Scanner;
+
 /**
  * Pattern 9: ADAPTER (Adaptee)
  *
@@ -21,14 +23,15 @@ public class CashPaymentService {
     /** The amount of cash the customer hands to the cashier for the current transaction. */
     private double amountReceived = 0.00;
 
+
     /**
      * Sets the amount of cash received from the customer.
      * Must be called before {@link #collectCash(double)} for each transaction.
      *
-     * @param amountReceived the cash amount the customer hands over in dollars
+     * @param amount the cash amount the customer hands over in dollars
      */
-    public void setAmountReceived(double amountReceived) {
-        this.amountReceived = amountReceived;
+    public void setAmountReceived(double amount) {
+        this.amountReceived = amount;
     }
 
     /**

@@ -17,7 +17,7 @@ public class PayOrderCommand implements Command {
 
     @Override
     public void execute() {
-        orderId = "ORDER-" + order.getCustomer().getId();
+        orderId = "ORDER-" + order.getOrderId();
         boolean result = paymentGateway.processPayment(orderId, order.getFinalPrice());
         if (!result) {
             throw new RuntimeException("[PayOrderCommand] Payment failed for: " + orderId);

@@ -21,14 +21,19 @@ public class StripeAdapter implements PaymentGateway{
 
     private final Map<String, PaymentStatus> paymentHistory = new HashMap<>();
 
-    public StripeAdapter(StripePaymentService gateway) {
-        this.stripeGateway = gateway;
+    public StripeAdapter(StripePaymentService paymentGateway) {
+        this.stripeGateway = paymentGateway;
     }
 
     @Override
     public boolean processPayment(String orderId, double amountInDollars) {
+
+        // Stripe's API might require a specific format for the order reference, so we create one based on the order ID.
         String orderRef = "STRIPE-" + orderId.toUpperCase();
+
+        // Stripe expects amounts in cents, so we convert dollars to cents.
         int amountInCents = (int) Math.round(amountInDollars * 100);
+
         boolean result = stripeGateway.charge(amountInCents, orderRef);
         paymentHistory.put(orderId, result ? PaymentStatus.PAYMENT_COMPLETE : PaymentStatus.PAYMENT_FAILED);
         return result;

@@ -1,6 +1,7 @@
 package dev.saberlabs;
 
 import dev.saberlabs.decorator.*;
+import dev.saberlabs.facade.CoffeeShopFacade;
 import dev.saberlabs.factory.*;
 import dev.saberlabs.models.*;
 import dev.saberlabs.observer.OrderObserver;
@@ -53,7 +54,7 @@ class CoffeeShopAppTest {
         void sharedState() {
             Customer customer = new Customer("C001", "Test");
             CoffeeShop shop = CoffeeShop.getInstance();
-            shop.placeOrder(new Order(customer, new Espresso()));
+            shop.placeOrder(new Order(customer, new Espresso(), 0));
             assertEquals(1, CoffeeShop.getInstance().getOrderCount());
         }
     }
@@ -212,7 +213,7 @@ class CoffeeShopAppTest {
         void cloneOrderForTheSameCustomer() {
             Customer customer = new Customer("C002", "Yassine");
             Coffee originalCoffee = new MilkDecorator(new Espresso());
-                Order originalOrder = new Order(customer, originalCoffee);
+                Order originalOrder = new Order(customer, originalCoffee, 2);
             Order clonedOrder = originalOrder.cloneOrder();
 
             assertSame(originalOrder.getCustomer(), clonedOrder.getCustomer());
@@ -224,7 +225,7 @@ class CoffeeShopAppTest {
         void cloneOrderForDifferentCustomer() {
             Customer customer = new Customer("C003", "Yassine");
             Coffee original = new MilkDecorator(new Espresso());
-            Order originalOrder = new Order(customer, original);
+            Order originalOrder = new Order(customer, original, 3);
             Order clonedOrder = originalOrder.cloneOrder(new Customer("C004", "Ahmed"));
 
             assertNotSame(originalOrder.getCustomer(), clonedOrder.getCustomer());
@@ -429,9 +430,9 @@ class CoffeeShopAppTest {
             }
             Coffee coffee = new Espresso();
 
-            Order order = new Order(regularCustomer, coffee);
-            Order silverOrder = new Order(silverCustomer, coffee);
-            Order goldOrder = new Order(goldCustomer, coffee);
+            Order order = new Order(regularCustomer, coffee, 4);
+            Order silverOrder = new Order(silverCustomer, coffee,5);
+            Order goldOrder = new Order(goldCustomer, coffee, 6);
 
             double expectedRegularPrice = coffee.getCost();
             double expectedSilverPrice = coffee.getCost() * 0.90;
@@ -452,7 +453,7 @@ class CoffeeShopAppTest {
 
             Coffee decoratedCoffee = new MilkDecorator(new SugarDecorator(new Espresso()));
             // Base: 2.50 + 0.25 + 0.50 = 3.25, Gold: 3.25 * 0.80 = 2.60
-            Order order = new Order(goldCustomer, decoratedCoffee);
+            Order order = new Order(goldCustomer, decoratedCoffee, 7);
 
             assertEquals(3.25 * 0.80, order.getFinalPrice(), 0.001);
         }
@@ -493,7 +494,7 @@ class CoffeeShopAppTest {
             shop.registerObserver(spy);
 
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 8);
             shop.placeOrder(order);
 
             assertEquals(1, spy.receivedEvents.size());
@@ -509,7 +510,7 @@ class CoffeeShopAppTest {
             shop.registerObserver(spy);
 
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 9);
             shop.placeOrder(order);
             order.setStatus(OrderStatus.READY);
             order.setStatus(OrderStatus.FULFILLED);
@@ -530,7 +531,7 @@ class CoffeeShopAppTest {
             shop.registerObserver(spy2);
 
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 10);
             shop.placeOrder(order);
 
             assertEquals(1, spy1.receivedEvents.size());
@@ -548,7 +549,7 @@ class CoffeeShopAppTest {
             shop.removeObserver(spy);
 
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 11);
             shop.placeOrder(order);
 
             assertEquals(0, spy.receivedEvents.size());
@@ -563,8 +564,8 @@ class CoffeeShopAppTest {
 
             Customer alice = new Customer("C001", "Alice");
             Customer bob = new Customer("C002", "Bob");
-            Order aliceOrder = new Order(alice, new Espresso());
-            Order bobOrder = new Order(bob, new Cappuccino());
+            Order aliceOrder = new Order(alice, new Espresso(), 12);
+            Order bobOrder = new Order(bob, new Cappuccino(), 13);
 
             shop.placeOrder(aliceOrder);
             shop.placeOrder(bobOrder);
@@ -586,7 +587,7 @@ class CoffeeShopAppTest {
             shop.registerObserver(bob);
             shop.registerObserver(spy);
 
-            Order bobOrder = new Order(bob, new Espresso());
+            Order bobOrder = new Order(bob, new Espresso(), 14);
             shop.placeOrder(bobOrder);
 
 
@@ -613,7 +614,7 @@ class CoffeeShopAppTest {
         @DisplayName("PlaceOrderCommand sets status to PLACED")
         void placeOrderCommand() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 15);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -625,7 +626,7 @@ class CoffeeShopAppTest {
         @DisplayName("PrepareOrderCommand sets status to READY")
         void prepareOrderCommand() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 16);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -638,7 +639,7 @@ class CoffeeShopAppTest {
         @DisplayName("FulfillOrderCommand sets status to FULFILLED")
         void fulfillOrderCommand() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 17);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -654,7 +655,7 @@ class CoffeeShopAppTest {
             Customer alice = new Customer("C001", "Alice");
             StripePaymentService stripeService = new StripePaymentService("1234567890123456", "Bob Smith", "12", "2028", "456");
             PaymentGateway alicePayment = new StripeAdapter(stripeService);
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 18);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -668,7 +669,7 @@ class CoffeeShopAppTest {
         @DisplayName("undo PlaceOrderCommand sets status to CANCELLED")
         void undoPlaceOrder() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 19);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -681,7 +682,7 @@ class CoffeeShopAppTest {
         @DisplayName("undo PrepareOrderCommand reverts to previous status")
         void undoPrepareOrder() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 20);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -696,7 +697,7 @@ class CoffeeShopAppTest {
         void undoFulfillOrder() {
             Customer alice = new Customer("C001", "Alice");
             CoffeeShop.getInstance().registerObserver(alice);
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 21);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -714,7 +715,7 @@ class CoffeeShopAppTest {
         @DisplayName("multiple consecutive undoes revert in reverse order")
         void multipleUndoes() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 22);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -743,7 +744,7 @@ class CoffeeShopAppTest {
         @DisplayName("invoker records full command history")
         void commandHistoryTracked() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 23);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -761,7 +762,7 @@ class CoffeeShopAppTest {
         @DisplayName("command history persists after undo")
         void historyPersistsAfterUndo() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 24);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -778,7 +779,7 @@ class CoffeeShopAppTest {
             Customer alice = new Customer("C001", "Alice");
             CoffeeShop.getInstance().registerObserver(alice);
             Coffee coffee = new MilkDecorator(new SugarDecorator(new Espresso()));
-            Order order = new Order(alice, coffee);
+            Order order = new Order(alice, coffee, 25);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(order));
@@ -798,8 +799,8 @@ class CoffeeShopAppTest {
         void multipleOrdersSameInvoker() {
             Customer alice = new Customer("C001", "Alice");
             Customer bob = new Customer("C002", "Bob");
-            Order aliceOrder = new Order(alice, new Espresso());
-            Order bobOrder = new Order(bob, new Cappuccino());
+            Order aliceOrder = new Order(alice, new Espresso(), 26);
+            Order bobOrder = new Order(bob, new Cappuccino(), 27);
             OrderInvoker invoker = new OrderInvoker();
 
             invoker.executeCommand(new PlaceOrderCommand(aliceOrder));
@@ -997,7 +998,7 @@ class CoffeeShopAppTest {
         @DisplayName("PayOrderCommand works with PayPal adapter")
         void payOrderCommandWithPayPal() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 28);
             PaymentGateway paypal = new PayPalAdapter(
                     new PayPalPaymentService("alice@mail.com", "pass"));
 
@@ -1011,7 +1012,7 @@ class CoffeeShopAppTest {
         @DisplayName("PayOrderCommand works with Stripe adapter")
         void payOrderCommandWithStripe() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 29);
             PaymentGateway stripe = new StripeAdapter(
                     new StripePaymentService("1234567890123456", "Alice", "12", "2028", "456"));
 
@@ -1025,7 +1026,7 @@ class CoffeeShopAppTest {
         @DisplayName("PayOrderCommand throws on payment failure")
         void payOrderCommandFailsOnInsufficientFunds() {
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 30);
             PayPalPaymentService paypalService = new PayPalPaymentService("alice@mail.com", "pass");
             paypalService.setBalance(0.01);
             PaymentGateway paypal = new PayPalAdapter(paypalService);
@@ -1178,7 +1179,7 @@ class CoffeeShopAppTest {
             PaymentGateway cashGateway = new CashPaymentAdapter(cashService);
 
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso());
+            Order order = new Order(alice, new Espresso(), 31);
 
             PayOrderCommand cmd = new PayOrderCommand(order, cashGateway);
             cmd.execute();
@@ -1194,7 +1195,7 @@ class CoffeeShopAppTest {
             PaymentGateway cashGateway = new CashPaymentAdapter(cashService);
 
             Customer alice = new Customer("C001", "Alice");
-            Order order = new Order(alice, new Espresso()); // $2.50
+            Order order = new Order(alice, new Espresso(), 32); // $2.50
 
             PayOrderCommand cmd = new PayOrderCommand(order, cashGateway);
 
@@ -1210,7 +1211,7 @@ class CoffeeShopAppTest {
             shop.registerObserver(alice);
 
             Coffee coffee = new MilkDecorator(new Espresso()); // $3.00
-            Order order = new Order(alice, coffee);
+            Order order = new Order(alice, coffee, 33);
 
             CashPaymentService cashService = new CashPaymentService();
             cashService.setAmountReceived(5.00);
@@ -1226,6 +1227,202 @@ class CoffeeShopAppTest {
             assertEquals(1, alice.getTotalOrders());
             assertEquals(4, invoker.getCommandHistory().size());
             assertEquals(order.getFinalPrice(), cashService.getCashRegisterTotal(), 0.001);
+        }
+    }
+
+    // =================================================================
+    // 10. FACADE
+    // =================================================================
+    @Nested
+    @DisplayName("10. Facade Pattern")
+    class FacadeTests {
+
+        private CoffeeShopFacade facade;
+        private PaymentGateway paymentGateway;
+        private Customer alice;
+        private Customer bob;
+
+        @BeforeEach
+        void setUp() {
+            CoffeeShop.getInstance().clearOrders();
+            PayPalPaymentService paypalService = new PayPalPaymentService("shop@mail.com", "pass");
+            paymentGateway = new PayPalAdapter(paypalService);
+            facade = new CoffeeShopFacade(paymentGateway);
+
+            alice = new Customer("C001", "Alice");
+            bob = new Customer("C002", "Bob");
+            facade.registerCustomer(alice);
+            facade.registerCustomer(bob);
+        }
+
+        @Test
+        @DisplayName("placeOrder creates order with correct coffee and extras")
+        void placeOrderWithExtras() {
+            Order order = facade.placeOrder(alice, new EspressoCreator(), "milk", "sugar");
+
+            assertEquals(OrderStatus.PLACED, order.getStatus());
+            assertTrue(order.getCoffee().getDescription().contains("Espresso"));
+            assertTrue(order.getCoffee().getDescription().contains("Milk"));
+            assertTrue(order.getCoffee().getDescription().contains("Sugar"));
+        }
+
+        @Test
+        @DisplayName("placeOrder auto-prices based on customer loyalty tier")
+        void placeOrderAutoPrices() {
+            // Alice is Regular — no discount
+            Order order = facade.placeOrder(alice, new EspressoCreator());
+            assertEquals(2.50, order.getFinalPrice(), 0.001);
+        }
+
+        @Test
+        @DisplayName("placeOrder registers order in CoffeeShop singleton")
+        void placeOrderRegistersInSingleton() {
+            facade.placeOrder(alice, new CappuccinoCreator());
+            facade.placeOrder(bob, new LatteCreator());
+
+            assertEquals(2, facade.getOrderCount());
+        }
+
+        @Test
+        @DisplayName("processOrder runs full lifecycle: prepare → pay → fulfill")
+        void processOrderFullLifecycle() {
+            Order order = facade.placeOrder(alice, new EspressoCreator());
+            facade.processOrder(order);
+
+            assertEquals(OrderStatus.FULFILLED, order.getStatus());
+            assertEquals(1, alice.getTotalOrders());
+        }
+
+        @Test
+        @DisplayName("processOrder uses template method for preparation")
+        void processOrderUsesTemplateMethod() {
+            Order order = facade.placeOrder(alice, new CappuccinoCreator());
+            facade.processOrder(order);
+
+            // If template method ran, the order reaches FULFILLED
+            assertEquals(OrderStatus.FULFILLED, order.getStatus());
+        }
+
+        @Test
+        @DisplayName("reorder clones order for the same customer")
+        void reorderSameCustomer() {
+            Order original = facade.placeOrder(alice, new EspressoCreator(), "milk");
+            facade.processOrder(original);
+
+            Order reordered = facade.reorder(original);
+
+            assertNotSame(original, reordered);
+            assertSame(alice, reordered.getCustomer());
+            assertEquals(original.getCoffee().getDescription(), reordered.getCoffee().getDescription());
+            assertEquals(OrderStatus.FULFILLED, reordered.getStatus());
+        }
+
+        @Test
+        @DisplayName("reorderForAnotherCustomer clones for different customer")
+        void reorderForDifferentCustomer() {
+            Order aliceOrder = facade.placeOrder(alice, new CappuccinoCreator(), "whipped_cream");
+            facade.processOrder(aliceOrder);
+
+            Order bobOrder = facade.reorderForAnotherCustomer(aliceOrder, bob);
+
+            assertNotSame(aliceOrder, bobOrder);
+            assertSame(bob, bobOrder.getCustomer());
+            assertEquals(aliceOrder.getCoffee().getDescription(), bobOrder.getCoffee().getDescription());
+            assertEquals(OrderStatus.FULFILLED, bobOrder.getStatus());
+        }
+
+        @Test
+        @DisplayName("reorder increments loyalty tier over multiple orders")
+        void reorderIncrementsLoyalty() {
+            Order order = facade.placeOrder(alice, new EspressoCreator());
+            facade.processOrder(order);
+
+            assertEquals(LoyaltyTier.REGULAR, alice.getLoyaltyTier());
+
+            // Reorder 5 more times — total 6 fulfilled orders → Silver
+            for (int i = 0; i < 5; i++) {
+                facade.reorder(order);
+            }
+
+            assertEquals(LoyaltyTier.SILVER, alice.getLoyaltyTier());
+        }
+
+        @Test
+        @DisplayName("undoLastAction reverts the last command")
+        void undoLastAction() {
+            Order order = facade.placeOrder(alice, new EspressoCreator());
+
+            facade.undoLastAction();
+
+            assertEquals(OrderStatus.CANCELLED, order.getStatus());
+        }
+
+        @Test
+        @DisplayName("getAllOrders returns all placed orders")
+        void getAllOrders() {
+            facade.placeOrder(alice, new EspressoCreator());
+            facade.placeOrder(bob, new CappuccinoCreator());
+            facade.placeOrder(alice, new LatteCreator(), "milk", "sugar", "whipped_cream");
+
+            List<Order> orders = facade.getAllOrders();
+            assertEquals(3, orders.size());
+        }
+
+        @Test
+        @DisplayName("command history tracks all operations")
+        void commandHistoryTracked() {
+            Order order = facade.placeOrder(alice, new EspressoCreator());
+            facade.processOrder(order);
+
+            // placeOrder = 1 command, processOrder = 3 commands (prepare + pay + fulfill)
+            assertEquals(4, facade.getInvoker().getCommandHistory().size());
+        }
+
+        @Test
+        @DisplayName("throws on unknown extra")
+        void unknownExtra() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> facade.placeOrder(alice, new EspressoCreator(), "caramel"));
+        }
+
+        @Test
+        @DisplayName("facade works with different payment adapters")
+        void facadeWithDifferentPaymentAdapters() {
+            // Cash payment facade
+            CashPaymentService cashService = new CashPaymentService();
+            cashService.setAmountReceived(50.00);
+            CoffeeShopFacade cashFacade = new CoffeeShopFacade(new CashPaymentAdapter(cashService));
+            cashFacade.registerCustomer(alice);
+
+            Order order = cashFacade.placeOrder(alice, new EspressoCreator(), "milk");
+            cashFacade.processOrder(order);
+
+            assertEquals(OrderStatus.FULFILLED, order.getStatus());
+        }
+
+        @Test
+        @DisplayName("full scenario: two customers, different tiers, reorders")
+        void fullScenario() {
+            // Alice places and processes 6 orders → Silver tier
+            for (int i = 0; i < 6; i++) {
+                Order order = facade.placeOrder(alice, new EspressoCreator());
+                facade.processOrder(order);
+            }
+            assertEquals(LoyaltyTier.SILVER, alice.getLoyaltyTier());
+
+            // Alice orders a fancy coffee — Silver pricing applies
+            Order aliceFancy = facade.placeOrder(alice, new CappuccinoCreator(), "milk", "whipped_cream");
+            // Cappuccino $3.50 + Milk $0.50 + WhippedCream $0.75 = $4.75, Silver 10% off = $4.275
+            assertEquals(4.75 * 0.90, aliceFancy.getFinalPrice(), 0.001);
+            facade.processOrder(aliceFancy);
+
+            // Bob says "I'll have what she's having"
+            Order bobOrder = facade.reorderForAnotherCustomer(aliceFancy, bob);
+
+            // Bob is Regular — no discount, same coffee
+            assertEquals(4.75, bobOrder.getFinalPrice(), 0.001);
+            assertEquals(aliceFancy.getCoffee().getDescription(), bobOrder.getCoffee().getDescription());
+            assertSame(bob, bobOrder.getCustomer());
         }
     }
 

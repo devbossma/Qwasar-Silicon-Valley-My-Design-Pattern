@@ -7,7 +7,7 @@ import dev.saberlabs.models.Order;
 public class AdapterDemo {
 
     public static void run() {
-        System.out.println("=== 9. ADAPTER — Unified PaymentGateway for PayPal, Stripe, and Cash ===");
+        System.out.println("=== 9. ADAPTER - Unified PaymentGateway for PayPal, Stripe, and Cash ===");
 
         Customer alice = new Customer("C001", "Alice");
         Customer bob   = new Customer("C002", "Bob");
@@ -38,7 +38,7 @@ public class AdapterDemo {
         System.out.printf("Cash    change : $%.2f%n", cash.getChange("ORDER-C"));
         System.out.printf("Register total : $%.2f%n", cashService.getCashRegisterTotal());
 
-        // ── Interchangeability — same method call, different providers ──
+        // ── Interchangeability - same method call, different providers ──
         System.out.println("-- All three implement PaymentGateway --");
         for (PaymentGateway gateway : new PaymentGateway[]{paypal, stripe, cash}) {
             System.out.println("  " + gateway.getClass().getSimpleName());

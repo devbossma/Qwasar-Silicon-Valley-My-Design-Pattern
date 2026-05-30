@@ -11,7 +11,7 @@ import dev.saberlabs.singleton.CoffeeShop;
 public class CommandDemo {
 
     public static void run() {
-        System.out.println("=== 8. COMMAND — Encapsulate operations with full undo support ===");
+        System.out.println("=== 8. COMMAND - Encapsulate operations with full undo support ===");
         CoffeeShop shop = CoffeeShop.getInstance();
         shop.clearOrders();
 
@@ -42,7 +42,7 @@ public class CommandDemo {
         System.out.println(invoker.getCommandHistory().stream()
                 .map(Command::getCommandName).toList());
 
-        // Undo demo — place a new order and immediately cancel it
+        // Undo demo - place a new order and immediately cancel it
         System.out.println("-- Undo demo --");
         Customer bob = new Customer("C002", "Bob");
         Order bobOrder = new Order(bob, new Espresso(), 2);

@@ -1,5 +1,12 @@
 package dev.saberlabs.template;
 
+/**
+ * Pattern 6: TEMPLATE METHOD — Concrete Class
+ *
+ * <p>Defines the latte-specific steps within the {@link CoffeePreparationTemplate} skeleton:
+ * brew espresso + steam milk + assemble at 93°C for 28 seconds, then drizzle vanilla syrup
+ * and add a light cocoa dust.
+ */
 public class LattePreparation extends CoffeePreparationTemplate {
      public LattePreparation() {
         super("Latte");

@@ -1,5 +1,12 @@
 package dev.saberlabs.template;
 
+/**
+ * Pattern 6: TEMPLATE METHOD — Concrete Class
+ *
+ * <p>Defines the cappuccino-specific steps within the {@link CoffeePreparationTemplate} skeleton:
+ * brew espresso base + steam milk + assemble at 90°C for 30 seconds, then add cocoa powder
+ * and a cinnamon dusting.
+ */
 public class CappuccinoPreparation extends CoffeePreparationTemplate {
 
     public CappuccinoPreparation() {

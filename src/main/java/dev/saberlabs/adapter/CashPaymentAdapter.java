@@ -83,7 +83,7 @@ public class CashPaymentAdapter implements PaymentGateway {
 
     /**
      * Returns the change owed to the customer for a specific transaction.
-     * This is a cash-specific concern — digital payment adapters do not need this.
+     * This is a cash-specific concern - digital payment adapters do not need this.
      *
      * @param orderId the order reference to look up
      * @return the change amount in dollars, or 0.00 if the order is unknown or failed

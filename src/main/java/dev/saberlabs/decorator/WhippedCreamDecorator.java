@@ -4,7 +4,7 @@ import dev.saberlabs.models.Coffee;
 
 /**
  * Pattern 5: DECORATOR (Concrete Decorator)
- *
+ * *
  * Adds whipped cream to a coffee order.
  */
 public class WhippedCreamDecorator extends CoffeeDecorator {

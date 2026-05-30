@@ -1,5 +1,13 @@
 package dev.saberlabs.template;
 
+/**
+ * Pattern 6: TEMPLATE METHOD — Concrete Class
+ *
+ * <p>Defines the espresso-specific steps within the {@link CoffeePreparationTemplate} skeleton:
+ * brew at 95°C for 25 seconds, skip condiments. The {@code prepareCoffee()} sequence
+ * (heat water → brew → add condiments) is inherited as a {@code final} method and cannot
+ * be overridden by subclasses.
+ */
 public class EspressoPreparation extends CoffeePreparationTemplate {
 
      public EspressoPreparation() {

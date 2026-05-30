@@ -15,7 +15,6 @@ import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
 
 import java.util.List;
-import java.util.Scanner;
 
 /**
  * Pattern 10: FACADE
@@ -42,6 +41,7 @@ import java.util.Scanner;
  * <pre>
  *     CoffeeShopFacade facade = new CoffeeShopFacade(paymentGateway);
  *     facade.registerCustomer(customer);
+ *
  *     Order order = facade.placeOrder(customer, new EspressoCreator(), "milk", "sugar");
  *     facade.processOrder(order);
  *     facade.reorder(order);
@@ -76,7 +76,7 @@ public class CoffeeShopFacade {
 
     /**
      * Registers a customer as an observer to receive order notifications. ( Observer pattern)
-     *
+     * *
      * We're already registering the Customer at PlaceOrderCommand. so this method is typically used for manual subscription.
      * @param customer the customer to register
      */

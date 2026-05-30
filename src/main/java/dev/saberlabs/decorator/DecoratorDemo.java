@@ -3,10 +3,13 @@ package dev.saberlabs.decorator;
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Espresso;
 
+/**
+ * Pattern 3: DECORATOR (Component and Concrete Component)
+ */
 public class DecoratorDemo {
 
     public static void run() {
-        System.out.println("=== 3. DECORATOR — Wrap a coffee with extras at runtime ===");
+        System.out.println("=== 3. DECORATOR - Wrap a coffee with extras at runtime ===");
 
         Coffee base = new Espresso();
         System.out.printf("Base            : %-40s $%.2f%n", base.getDescription(), base.getCost());

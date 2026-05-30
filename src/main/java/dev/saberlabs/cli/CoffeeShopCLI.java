@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 /**
- * Interactive Coffee Shop CLI — simulates a full coffee machine experience.
+ * Interactive Coffee Shop CLI - simulates a full coffee machine experience.
  * Demonstrates all 10 design patterns working together through the Facade.
  */
 public class CoffeeShopCLI {
@@ -35,7 +35,7 @@ public class CoffeeShopCLI {
 
     public CoffeeShopCLI() {
         this.scanner = new Scanner(System.in);
-        this.facade = new CoffeeShopFacade(null); // no default gateway — set at checkout
+        this.facade = new CoffeeShopFacade(null); // no default gateway - set at checkout
         this.customers = new HashMap<>();
         this.currentCustomer = null;
     }
@@ -224,7 +224,7 @@ public class CoffeeShopCLI {
             facade.processOrder(order);
             System.out.println();
             System.out.println("  ✓ Order complete!");
-            System.out.printf("  %s — %s — $%.2f%n",
+            System.out.printf("  %s - %s - $%.2f%n",
                     currentCustomer.getName(), order.getCoffee().getDescription(), order.getFinalPrice());
             System.out.printf("  Loyalty Tier: %s (%d total orders)%n%n",
                     currentCustomer.getLoyaltyTier(), currentCustomer.getTotalOrders());
@@ -234,7 +234,7 @@ public class CoffeeShopCLI {
     }
 
     // ================================================================
-    // 4. Reorder (Prototype — same customer)
+    // 4. Reorder (Prototype - same customer)
     // ================================================================
 
     private void handleReorder() {
@@ -273,7 +273,7 @@ public class CoffeeShopCLI {
             Order clonedOrder = facade.reorder(originalOrder);
             System.out.println();
             System.out.println("  ✓ Reorder complete!");
-            System.out.printf("  Cloned: %s — $%.2f%n%n",
+            System.out.printf("  Cloned: %s - $%.2f%n%n",
                     clonedOrder.getCoffee().getDescription(), clonedOrder.getFinalPrice());
         } catch (RuntimeException e) {
             System.out.println("  ✗ " + e.getMessage() + "\n");
@@ -281,7 +281,7 @@ public class CoffeeShopCLI {
     }
 
     // ================================================================
-    // 5. Reorder for Another Customer (Prototype — different customer)
+    // 5. Reorder for Another Customer (Prototype - different customer)
     // ================================================================
 
     private void handleReorderForAnother() {
@@ -346,7 +346,7 @@ public class CoffeeShopCLI {
         try {
             Order clonedOrder = facade.reorderForAnotherCustomer(originalOrder, targetCustomer);
             System.out.println();
-            System.out.printf("  ✓ %s got %s's order: %s — $%.2f%n%n",
+            System.out.printf("  ✓ %s got %s's order: %s - $%.2f%n%n",
                     targetCustomer.getName(), sourceCustomer.getName(),
                     clonedOrder.getCoffee().getDescription(), clonedOrder.getFinalPrice());
         } catch (RuntimeException e) {
@@ -490,7 +490,7 @@ public class CoffeeShopCLI {
             };
         }
 
-        System.out.printf("  → %s — $%.2f%n", coffee.getDescription(), coffee.getCost());
+        System.out.printf("  → %s - $%.2f%n", coffee.getDescription(), coffee.getCost());
         return coffee;
     }
 
@@ -570,7 +570,7 @@ public class CoffeeShopCLI {
     private void printOrderList(List<Order> orders) {
         for (int i = 0; i < orders.size(); i++) {
             Order o = orders.get(i);
-            System.out.printf("  %d. %s — $%.2f (%s)%n",
+            System.out.printf("  %d. %s - $%.2f (%s)%n",
                     i + 1, o.getCoffee().getDescription(), o.getFinalPrice(), o.getStatus());
         }
     }

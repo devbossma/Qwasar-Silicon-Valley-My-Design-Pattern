@@ -14,8 +14,10 @@ import dev.saberlabs.template.TemplateMethodDemo;
 
 public class CoffeeShopApplication {
 
-    static void main(String[] args) {
+    public static void main(String[] args) {
 //        new CoffeeShopCLI().run();
+
+
         System.out.println("=== COFFEE SHOP — DESIGN PATTERNS DEMO ===\n");
 
 

@@ -3,6 +3,7 @@ package dev.saberlabs.factory;
 
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Latte;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Pattern 2: FACTORY METHOD — Concrete Creator
@@ -12,7 +13,7 @@ import dev.saberlabs.models.Latte;
  */
 public class LatteCreator extends CoffeeCreator {
     @Override
-    public Coffee createCoffee() {
+    public @NotNull Coffee createCoffee() {
         return new Latte();
     }
 }

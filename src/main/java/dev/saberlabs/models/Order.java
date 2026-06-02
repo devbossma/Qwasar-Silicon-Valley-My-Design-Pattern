@@ -1,9 +1,12 @@
 package dev.saberlabs.models;
 
-import dev.saberlabs.observer.OrderNotificationService;
 import dev.saberlabs.prototype.CloneableOrder;
 import dev.saberlabs.singleton.CoffeeShop;
 import dev.saberlabs.strategy.PricingStrategy;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
 
 
 /**
@@ -17,18 +20,20 @@ public class Order implements CloneableOrder {
     private final Coffee coffee;
     private final PricingStrategy pricingStrategy;
     private double finalPrice;
-    private OrderStatus status = null;
-    private boolean fulfilled = false;
-    private final int OrderId;
+    private volatile @Nullable OrderStatus status = null;
+    private volatile boolean fulfilled = false;
+    private final @NotNull String orderId;
 
 
-    public Order(Customer customer, Coffee coffee, int orderId) {
+    public Order(@NotNull Customer customer, @NotNull Coffee coffee, @NotNull String orderId) {
+        Objects.requireNonNull(customer, "Customer cannot be null");
+        Objects.requireNonNull(coffee, "Coffee cannot be null");
+        Objects.requireNonNull(orderId, "OrderId cannot be null");
         this.customer = customer;
         this.coffee = coffee;
         this.pricingStrategy = customer.getLoyaltyTier().getStrategy();
-        this.OrderId = orderId;
+        this.orderId = orderId;
         this.finalPrice = calculateFinalPrice();
-
     }
 
     /**
@@ -36,7 +41,7 @@ public class Order implements CloneableOrder {
      * @return the customer
      *
      */
-    public Customer getCustomer() {
+    public @NotNull  Customer getCustomer() {
         return customer;
     }
 
@@ -44,7 +49,7 @@ public class Order implements CloneableOrder {
      * Returns the coffee associated with this order.
      * @return the coffee object associated with this order
      */
-    public Coffee getCoffee() {
+    public @NotNull Coffee getCoffee() {
         return coffee;
     }
 
@@ -70,8 +75,9 @@ public class Order implements CloneableOrder {
      * Returns the unique identifier for this order.
      * @return the order ID
      */
-    public int getOrderId() {
-        return OrderId;
+
+    public @NotNull String getOrderId() {
+        return orderId;
     }
 
 
@@ -79,7 +85,7 @@ public class Order implements CloneableOrder {
      * Returns the current status of the order (e.g., PLACED, PREPARING, READY, FULFILLED, CANCELLED).
      * @return the order status
      */
-    public OrderStatus getStatus() {
+    public @Nullable OrderStatus getStatus() {
         return status;
     }
 
@@ -89,13 +95,12 @@ public class Order implements CloneableOrder {
      *
      * @param status the new status to set for the order
      */
-    public void setStatus(OrderStatus status) {
+    public synchronized void setStatus(OrderStatus status) {
         this.status = status;
         if (OrderStatus.FULFILLED.equals(status) && !fulfilled) {
             fulfilled = true;
             customer.incrementOrders();
         }
-        // Notify observers of the status change
         CoffeeShop.getInstance().getNotificationService().notifyObservers(this);
     }
 
@@ -107,14 +112,15 @@ public class Order implements CloneableOrder {
 
     // Implement the cloneOrder method to create a deep copy of the order
     @Override
-    public Order cloneOrder() {
-        int orderId = CoffeeShop.getInstance().nextOrderId();
+    @NotNull
+    public  Order cloneOrder() {
+        String orderId = CoffeeShop.getInstance().nextOrderId();
         return new Order(this.customer, this.coffee.cloneCoffee(), orderId );
     }
 
     // Overloaded method to clone the order for a different customer (e.g., for a friend)
     public Order cloneOrder(Customer newCustomer) {
-        int orderId = CoffeeShop.getInstance().nextOrderId();
+        String orderId = CoffeeShop.getInstance().nextOrderId();
         return new Order(newCustomer, this.coffee.cloneCoffee(), orderId);
     }
 

@@ -1,6 +1,7 @@
 package dev.saberlabs.decorator;
 
 import dev.saberlabs.models.Coffee;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Pattern 5: DECORATOR (Concrete Decorator)
@@ -11,12 +12,12 @@ public class SugarDecorator extends CoffeeDecorator {
 
     private static final double SUGAR_COST = 0.25;
 
-    public SugarDecorator(Coffee coffee) {
+    public SugarDecorator(@NotNull Coffee coffee) {
         super(coffee);
     }
 
     @Override
-    public String getDescription() {
+    public @NotNull String getDescription() {
         return decoratedCoffee.getDescription() + " + Sugar";
     }
 
@@ -26,7 +27,7 @@ public class SugarDecorator extends CoffeeDecorator {
     }
 
     @Override
-    public Coffee cloneCoffee() {
+    public @NotNull Coffee cloneCoffee() {
         return new SugarDecorator(decoratedCoffee.cloneCoffee());
     }
 }

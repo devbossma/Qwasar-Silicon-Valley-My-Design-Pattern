@@ -1,6 +1,7 @@
 package dev.saberlabs.prototype;
 
 import dev.saberlabs.models.Coffee;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Pattern 4: PROTOTYPE — Cloneable Coffee Interface
@@ -17,5 +18,5 @@ public interface CloneableCoffee extends Cloneable {
      * @return a clone of this coffee
      */
 
-    Coffee cloneCoffee();
+    @NotNull Coffee cloneCoffee();
 }

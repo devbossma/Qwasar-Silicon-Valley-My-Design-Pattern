@@ -2,6 +2,10 @@ package dev.saberlabs.models;
 
 
 import dev.saberlabs.observer.OrderObserver;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Represents a coffee shop customer.
@@ -9,10 +13,21 @@ import dev.saberlabs.observer.OrderObserver;
  */
 public class Customer implements OrderObserver {
 
-    private final String id;
-    private final String name;
-    private LoyaltyTier loyaltyTier;
-    private int totalOrders;
+    private final @NotNull String id;
+    private final @NotNull String name;
+
+    /**
+     * Loyalty tier of the customer, determined by the total number of orders placed.
+     * Volatile is used to ensure visibility of changes across threads
+     * as the loyalty tier may be updated by multiple threads when orders are placed concurrently.
+     */
+    private volatile @NotNull LoyaltyTier loyaltyTier;
+
+    /**
+     * Total number of orders placed by the customer. Used to determine loyalty tier.
+     * Using AtomicInteger to ensure thread safety if multiple orders are placed concurrently for the same customer.
+     */
+    private final AtomicInteger totalOrders = new AtomicInteger(0);
 
     /**
      * Initializes a new customer with the given ID and name.
@@ -20,10 +35,13 @@ public class Customer implements OrderObserver {
      * @param id   unique identifier for the customer
      * @param name customer's name
      */
-    public Customer(String id, String name) {
+    public Customer(@NotNull String id, @NotNull String name) {
+        // Validate that ID and name are not null to prevent issues in collections and notifications.
+        Objects.requireNonNull(id, "Customer ID cannot be null");
+        Objects.requireNonNull(name, "Customer name cannot be null");
+        
         this.id = id;
         this.name = name;
-        this.totalOrders = 0;
         this.loyaltyTier = LoyaltyTier.REGULAR;
     }
 
@@ -32,51 +50,65 @@ public class Customer implements OrderObserver {
      * Increments the counter and recalculates the loyalty tier.
      */
     public void incrementOrders() {
-        totalOrders++;
-        recalculateTier();
+        int updated = totalOrders.incrementAndGet();
+        recalculateTier(updated);
     }
 
-    private void recalculateTier() {
-        if (totalOrders > 10) {
-            loyaltyTier = LoyaltyTier.GOLD;
-        } else if (totalOrders > 5) {
-            loyaltyTier = LoyaltyTier.SILVER;
-        } else {
-            loyaltyTier = LoyaltyTier.REGULAR;
-        }
+    /**
+     * Recalculates the loyalty tier based on the total number of orders.
+     * Loyalty tiers are defined as follows:
+     * - REGULAR: 0-5 orders
+     * - SILVER: 6-10 orders
+     * - GOLD: 11+ orders
+     * This method is synchronized to ensure thread safety when updating the loyalty tier based on the total orders.
+     * @param count the updated total number of orders
+     */
+    private synchronized void recalculateTier(int count) {
+        if (count > 10) loyaltyTier = LoyaltyTier.GOLD;
+        else if (count > 5) loyaltyTier = LoyaltyTier.SILVER;
+        else loyaltyTier = LoyaltyTier.REGULAR;
     }
 
-    public String getId() {
+    /**
+     * Gets the total number of orders placed by the customer.
+     * This method is thread-safe due to the use of AtomicInteger.
+     * @return total number of orders
+     */
+    public int getTotalOrders() {
+        return totalOrders.get();
+    }
+
+    public @NotNull  String getId() {
         return id;
     }
 
-    public String getName() {
+    public @NotNull String getName() {
         return name;
     }
 
-    public LoyaltyTier getLoyaltyTier() {
+    public @NotNull LoyaltyTier getLoyaltyTier() {
         return loyaltyTier;
     }
 
-    public int getTotalOrders() {
-        return totalOrders;
-    }
+
 
     @Override
     public String toString() {
         return String.format("Customer[id=%s, name=%s, tier=%s, orders=%d]",
-                id, name, loyaltyTier, totalOrders);
+                id, name, loyaltyTier, totalOrders.get());
     }
 
     // Observer method to receive updates about order status changes.
     // Only prints messages for orders belonging to this customer.
     @Override
-    public void update(Order order, OrderStatus event) {
+    public void update(@NotNull Order order, @NotNull OrderStatus event) {
         if (order.getCustomer().equals(this) ) {
             switch (event) {
-                case OrderStatus.PLACED -> System.out.println("[NOTIFICATION] "+ name +" Your order has been placed.");
-                case OrderStatus.READY -> System.out.println("[NOTIFICATION] "+ name +"  Your order is ready for pickup.");
-                case OrderStatus.FULFILLED -> System.out.println("[NOTIFICATION] "+ name +"  Your order has been fulfilled. Enjoy your coffee :)");
+                case PLACED -> System.out.println("[NOTIFICATION] "+ name +" Your order has been placed.");
+                case READY -> System.out.println("[NOTIFICATION] "+ name +"  Your order is ready for pickup.");
+                case FULFILLED -> System.out.println("[NOTIFICATION] "+ name +"  Your order has been fulfilled. Enjoy your coffee :)");
+                case CANCELLED -> System.out.println("[NOTIFICATION] " + name + " Your order has been cancelled.");
+                case PREPARING -> System.out.println("[NOTIFICATION] " + name + " Your order will be ready soon.");
             }
         }
     }

@@ -4,6 +4,7 @@ import dev.saberlabs.strategy.GoldMemberPricing;
 import dev.saberlabs.strategy.PricingStrategy;
 import dev.saberlabs.strategy.RegularPricing;
 import dev.saberlabs.strategy.SilverMemberPricing;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Supplier;
 
@@ -26,7 +27,7 @@ public enum LoyaltyTier {
         this.strategyFactory = strategyFactory;
     }
 
-    public PricingStrategy getStrategy() {
+    public @NotNull  PricingStrategy getStrategy() {
         return strategyFactory.get();
     }
 }

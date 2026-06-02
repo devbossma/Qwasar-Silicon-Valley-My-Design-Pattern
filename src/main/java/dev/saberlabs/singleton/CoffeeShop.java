@@ -4,10 +4,12 @@ import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.observer.OrderNotificationService;
 import dev.saberlabs.observer.OrderObserver;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -21,20 +23,25 @@ public class CoffeeShop {
     // Volatile variable to ensure visibility of changes across threads and prevent instruction reordering issues.
     private static volatile CoffeeShop INSTANCE;
 
-    // List to store orders placed at the coffee shop
-    private final List<Order> orders = new ArrayList<>();
+    /**
+     * Thread-safe list to store orders.
+     * Using Collections.synchronizedList to ensure that all operations on the list are thread-safe.
+     */
 
-    // AtomicInteger to generate unique command IDs for orders, ensuring thread safety when multiple threads are placing orders simultaneously.
-    private final AtomicInteger commandIdCounter = new AtomicInteger(0);
+    private final List<Order> orders = Collections.synchronizedList(new ArrayList<>());
+
+    // AtomicInteger to generate unique IDs for orders and customers in a thread-safe manner
+    private final AtomicInteger orderIdCounter = new AtomicInteger(0);
+    private final AtomicInteger customerIdCounter = new AtomicInteger(0);
 
     // Shared notification service for all orders
-    private final OrderNotificationService notificationService = new OrderNotificationService();
+    private final @NotNull OrderNotificationService notificationService = new OrderNotificationService();
 
     // private constructor prevents external instantiation
     private CoffeeShop() { }
 
     // Provides global access to the singleton instance
-    public static CoffeeShop getInstance() {
+    public static @NotNull CoffeeShop getInstance() {
         // Declaring a local variable to reduce the number of volatile reads
         CoffeeShop  coffeeShop = INSTANCE;
 
@@ -57,29 +64,53 @@ public class CoffeeShop {
     }
 
     // Register an observer to receive order status notifications
-    public void registerObserver(OrderObserver observer) {
+    public void registerObserver(@NotNull OrderObserver observer) {
+        Objects.requireNonNull(observer, "Observer cannot be null");
         notificationService.registerObserver(observer);
     }
 
     // Remove an observer from receiving notifications
-    public void removeObserver(OrderObserver observer) {
+    public void removeObserver(@NotNull OrderObserver observer) {
+        Objects.requireNonNull(observer, "Observer cannot be null");
         notificationService.removeObserver(observer);
     }
 
-    public void placeOrder(Order order) {
-        orders.add(order);
+    /**
+     * Places a new order in the coffee shop.
+     * This method is synchronized to ensure thread safety when adding orders to the list.
+     * @param order the order to be placed.
+     */
+    public void placeOrder(@NotNull Order order) {
+        Objects.requireNonNull(order, "Order cannot be null");
+        synchronized (orders) {
+            orders.add(order);
+        }
         System.out.println("[CoffeeShop] New Order Placed: " + order);
         order.setStatus(OrderStatus.PLACED);
     }
 
-    // Method to retrieve an unmodifiable list of current orders
-    public List<Order> getOrders() {
-        return Collections.unmodifiableList(orders);
+    /**
+     * Returns a copy of the current list of orders to prevent external modification.
+     * The method is synchronized to ensure thread safety when accessing the orders list.
+     * @return a list of current orders
+     */
+    public @NotNull List<Order> getOrders() {
+        synchronized (orders) {
+            return List.copyOf(orders);
+        }
     }
 
-    // Method to clear all orders (for testing purposes)
+    /**
+     * Clears all orders from the coffee shop.
+     * This method is primarily for testing purposes to reset the state of the coffee shop.
+     * The method is synchronized to ensure thread safety when modifying the orders list and resetting counters.
+     */
     public void clearOrders() {
-        orders.clear();
+        synchronized (orders) {
+            orders.clear();
+        }
+        orderIdCounter.set(0);
+        customerIdCounter.set(0);
     }
 
     // Method to get the count of current orders
@@ -88,20 +119,24 @@ public class CoffeeShop {
     }
 
     // Expose the notification service for Order to use during status changes
-    public OrderNotificationService getNotificationService() {
+    public @NotNull OrderNotificationService getNotificationService() {
         return notificationService;
     }
 
     /**
-     * Generates the next unique command ID.
+     * Generates the next unique Order ID.
      *
-     * @return the next command ID
+     * @return the next Order ID
      */
-    public int nextOrderId() {
-        return commandIdCounter.incrementAndGet();
+    public @NotNull String nextOrderId() {
+        return "ORD-" + orderIdCounter.incrementAndGet();
     }
 
-    public String nextCustomerId() {
-        return "Customer-" + commandIdCounter.incrementAndGet();
+    /**
+     * Generates the next unique customer ID.
+     * @return the next customer ID
+     */
+    public @NotNull String nextCustomerId() {
+        return "CUST-" + customerIdCounter.incrementAndGet();
     }
 }

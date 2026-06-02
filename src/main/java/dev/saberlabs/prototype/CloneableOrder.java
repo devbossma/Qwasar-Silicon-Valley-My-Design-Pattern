@@ -1,6 +1,7 @@
 package dev.saberlabs.prototype;
 
 import dev.saberlabs.models.Order;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Pattern 4: PROTOTYPE — Cloneable Order Interface
@@ -17,5 +18,5 @@ public interface CloneableOrder extends Cloneable {
      * @return a clone of this coffee order
      */
 
-    Order cloneOrder();
+    @NotNull Order cloneOrder();
 }

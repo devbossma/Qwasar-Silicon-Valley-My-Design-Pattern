@@ -2,6 +2,7 @@ package dev.saberlabs.models;
 
 import dev.saberlabs.template.CoffeePreparationTemplate;
 import dev.saberlabs.template.LattePreparation;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Concrete coffee: Latte.
@@ -9,7 +10,7 @@ import dev.saberlabs.template.LattePreparation;
 public class Latte implements Coffee {
 
     @Override
-    public String getDescription() {
+    public @NotNull String getDescription() {
         return "Latte";
     }
 
@@ -19,7 +20,7 @@ public class Latte implements Coffee {
     }
 
     @Override
-    public Coffee cloneCoffee() {
+    public @NotNull Coffee cloneCoffee() {
         return new Latte();
     }
 
@@ -29,7 +30,7 @@ public class Latte implements Coffee {
     }
 
     @Override
-    public CoffeePreparationTemplate getPreparation() {
+    public @NotNull CoffeePreparationTemplate getPreparation() {
         return new LattePreparation();
     }
 }

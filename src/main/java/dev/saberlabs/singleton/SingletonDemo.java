@@ -6,6 +6,10 @@ import dev.saberlabs.models.Order;
 
 public class SingletonDemo {
 
+    static void main(String[] args) {
+        run();
+    }
+
     public static void run() {
         System.out.println("=== 1. SINGLETON — One global CoffeeShop instance ===");
         CoffeeShop.getInstance().clearOrders();
@@ -19,6 +23,6 @@ public class SingletonDemo {
         ref1.placeOrder(new Order(alice, new Espresso(), 1));
         System.out.println("Orders via ref1 : " + ref1.getOrderCount());
         System.out.println("Orders via ref2 : " + ref2.getOrderCount());
-        System.out.println();
+        System.out.println("=== End of Singleton Demo ===\n");
     }
 }

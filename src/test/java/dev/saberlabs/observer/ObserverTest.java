@@ -90,6 +90,22 @@ class ObserverTest {
     }
 
     @Test
+    @DisplayName("registering the same observer twice still sends one notification")
+    void duplicateObserverRegistrationIsIgnored() {
+        CoffeeShop shop = CoffeeShop.getInstance();
+        SpyObserver spy = new SpyObserver();
+        shop.registerObserver(spy);
+        shop.registerObserver(spy);
+
+        Customer alice = new Customer("C001", "Alice");
+        Order order = new Order(alice, new Espresso(), 34);
+        shop.placeOrder(order);
+
+        assertEquals(1, spy.receivedEvents.size());
+        assertEquals(OrderStatus.PLACED, spy.receivedEvents.getFirst());
+    }
+
+    @Test
     @DisplayName("removed observer stops receiving notifications")
     void removedObserverReceivesNothing() {
         CoffeeShop shop = CoffeeShop.getInstance();

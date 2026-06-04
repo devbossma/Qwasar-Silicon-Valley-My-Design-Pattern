@@ -37,7 +37,7 @@ public class CoffeeShopApplication {
         System.out.println("2. FACTORY METHOD — create coffees without knowing concrete classes");
         System.out.println("---------------------------------------------------------------");
 
-        FactoryMethodDemo.run();
+        FactoryMethodDemo.main();
 
         // ---------------------------------------------------------------
         // 3. DECORATOR — add extras to a coffee

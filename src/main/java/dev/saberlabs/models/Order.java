@@ -36,6 +36,10 @@ public class Order implements CloneableOrder {
         this.finalPrice = calculateFinalPrice();
     }
 
+    public Order(@NotNull Customer customer, @NotNull Coffee coffee, int orderId) {
+        this(customer, coffee, String.valueOf(orderId));
+    }
+
     /**
      * Returns the customer associated with this order.
      * @return the customer
@@ -95,13 +99,24 @@ public class Order implements CloneableOrder {
      *
      * @param status the new status to set for the order
      */
-    public synchronized void setStatus(OrderStatus status) {
+    public synchronized void setStatus(@NotNull OrderStatus status) {
+        Objects.requireNonNull(status, "Order status cannot be null");
         this.status = status;
         if (OrderStatus.FULFILLED.equals(status) && !fulfilled) {
             fulfilled = true;
             customer.incrementOrders();
         }
         CoffeeShop.getInstance().getNotificationService().notifyObservers(this);
+    }
+
+    /**
+     * Restores persisted status without notifying observers or changing loyalty counters.
+     *
+     * @param status the persisted status
+     */
+    public synchronized void restoreStatus(@Nullable OrderStatus status) {
+        this.status = status;
+        fulfilled = OrderStatus.FULFILLED.equals(status);
     }
 
     // Use the pricing strategy to calculate the final price based on the customer's loyalty tier

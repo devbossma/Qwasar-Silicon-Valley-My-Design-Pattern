@@ -25,7 +25,7 @@ public class PayPalPaymentService {
      * @param reference     a transaction reference string
      * @return true if payment succeeds
      */
-    public boolean makePayment(int amountInCents, String reference) {
+    public synchronized boolean makePayment(int amountInCents, String reference) {
         if(!connect()) {
             System.out.printf("[PayPalPayment] Failed to connect for %s%n", email);
             return false;
@@ -48,12 +48,12 @@ public class PayPalPaymentService {
         return true;
     }
 
-    public double getBalance() {
+    public synchronized double getBalance() {
         System.out.printf("[PayPalPaymentService] Getting balance: %s%n", email);
         return balance;
     }
 
-    public void setBalance(double balance) {
+    public synchronized void setBalance(double balance) {
         this.balance = balance;
     }
 }

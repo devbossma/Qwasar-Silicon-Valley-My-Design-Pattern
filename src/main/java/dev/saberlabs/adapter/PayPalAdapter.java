@@ -1,8 +1,8 @@
 package dev.saberlabs.adapter;
 
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Pattern 9: ADAPTER (Adapter class)
@@ -17,7 +17,7 @@ public class PayPalAdapter implements PaymentGateway {
      * This service expects payments in cents and uses an orderId as a reference.
      */
     private final PayPalPaymentService gateway;
-    private final Map<String, PaymentStatus> orderHistory = new HashMap<>();
+    private final Map<String, PaymentStatus> orderHistory = new ConcurrentHashMap<>();
 
     public PayPalAdapter (PayPalPaymentService payPalGateway){
         this.gateway = payPalGateway;

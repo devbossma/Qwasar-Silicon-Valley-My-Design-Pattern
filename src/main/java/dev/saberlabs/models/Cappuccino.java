@@ -9,6 +9,11 @@ import org.jetbrains.annotations.NotNull;
  */
 public class Cappuccino implements Coffee {
 
+    /**
+     * Returns a description of the coffee, including its type and any added ingredients (if decorated).
+     *
+     * @return
+     */
     @Override
     public @NotNull String getDescription() {
         return "Cappuccino";

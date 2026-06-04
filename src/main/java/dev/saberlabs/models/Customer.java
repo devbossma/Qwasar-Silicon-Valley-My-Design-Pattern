@@ -55,6 +55,19 @@ public class Customer implements OrderObserver {
     }
 
     /**
+     * Restores the fulfilled order count from persisted state without replaying notifications.
+     *
+     * @param count the persisted fulfilled order count
+     */
+    public void restoreTotalOrders(int count) {
+        if (count < 0) {
+            throw new IllegalArgumentException("Total orders cannot be negative");
+        }
+        totalOrders.set(count);
+        recalculateTier(count);
+    }
+
+    /**
      * Recalculates the loyalty tier based on the total number of orders.
      * Loyalty tiers are defined as follows:
      * - REGULAR: 0-5 orders

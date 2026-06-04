@@ -1,8 +1,10 @@
 package dev.saberlabs.command;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
-import java.util.Stack;
+import java.util.Objects;
 
 /**
  * Pattern 8: COMMAND - Invoker
@@ -15,15 +17,16 @@ import java.util.Stack;
 public class OrderInvoker {
 
     private final List<Command> commandHistory = new ArrayList<>();
-    private final Stack<Command> undoStack = new Stack<>();
+    private final Deque<Command> undoStack = new ArrayDeque<>();
 
-    public void executeCommand(Command command) {
+    public synchronized void executeCommand(Command command) {
+        Objects.requireNonNull(command, "Command cannot be null");
         command.execute();
         commandHistory.add(command);
         undoStack.push(command);
     }
 
-    public void undoLastCommand() {
+    public synchronized void undoLastCommand() {
         if (!undoStack.isEmpty()) {
             Command command = undoStack.pop();
             command.undo();
@@ -31,7 +34,7 @@ public class OrderInvoker {
         }
     }
 
-    public List<Command> getCommandHistory() {
-        return commandHistory;
+    public synchronized List<Command> getCommandHistory() {
+        return List.copyOf(commandHistory);
     }
 }

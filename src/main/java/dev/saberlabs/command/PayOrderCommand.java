@@ -3,6 +3,9 @@ package dev.saberlabs.command;
 import dev.saberlabs.adapter.PaymentGateway;
 import dev.saberlabs.adapter.PaymentStatus;
 import dev.saberlabs.models.Order;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
 
 /**
  * Pattern 8: COMMAND - Concrete Command
@@ -19,9 +22,9 @@ public class PayOrderCommand implements Command {
     private final PaymentGateway paymentGateway;
     private String orderId;
 
-    public PayOrderCommand(Order order, PaymentGateway paymentGateway) {
-        this.order = order;
-        this.paymentGateway = paymentGateway;
+    public PayOrderCommand(@NotNull Order order, @NotNull PaymentGateway paymentGateway) {
+        this.order = Objects.requireNonNull(order, "Order cannot be null");
+        this.paymentGateway = Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
     }
 
     @Override

@@ -1,6 +1,7 @@
 package dev.saberlabs.observer;
 
 import dev.saberlabs.models.Order;
+import org.jetbrains.annotations.NotNull;
 
 
 /**
@@ -14,11 +15,11 @@ import dev.saberlabs.models.Order;
 public interface Observable {
     
     // Method to register observers.
-    void registerObserver(OrderObserver observer);
+    void registerObserver(@NotNull OrderObserver observer);
     
     // Method to remove observers.
-    void removeObserver(OrderObserver observer);
+    void removeObserver(@NotNull OrderObserver observer);
     
     // Method to notify all registered observers of a change in the order status.
-    void notifyObservers(Order order);
+    void notifyObservers(@NotNull Order order);
 }

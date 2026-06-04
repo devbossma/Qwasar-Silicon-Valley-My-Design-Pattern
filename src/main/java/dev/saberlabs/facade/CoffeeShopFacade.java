@@ -13,8 +13,10 @@ import dev.saberlabs.decorator.WhippedCreamDecorator;
 import dev.saberlabs.models.*;
 import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Pattern 10: FACADE
@@ -58,17 +60,18 @@ public class CoffeeShopFacade {
      * Creates a new CoffeeShopFacade.
         * Initializes the CoffeeShop singleton, the Command invoker, and sets a default payment gateway adapter.
      */
-    public CoffeeShopFacade(PaymentGateway paymentGateway) {
+    public CoffeeShopFacade(@NotNull PaymentGateway paymentGateway) {
         this.coffeeShop = CoffeeShop.getInstance();
         this.invoker = new OrderInvoker();
-        this.paymentGateway = paymentGateway;
+        this.paymentGateway = Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
     }
 
     // ================================================================
     // Customer Management (Observer)
     // ================================================================
 
-    public Customer createCustomer(String customerName) {
+    public @NotNull Customer createCustomer(@NotNull String customerName) {
+        Objects.requireNonNull(customerName, "Customer name cannot be null");
         // get a random unique ID for the customer (for simplicity, using the nextCustomerId from CoffeeShop)
         String customerId = coffeeShop.nextCustomerId();
         return new Customer(customerId, customerName);
@@ -80,7 +83,8 @@ public class CoffeeShopFacade {
      * We're already registering the Customer at PlaceOrderCommand. so this method is typically used for manual subscription.
      * @param customer the customer to register
      */
-    public void registerCustomer(OrderObserver customer) {
+    public void registerCustomer(@NotNull OrderObserver customer) {
+        Objects.requireNonNull(customer, "Customer observer cannot be null");
         coffeeShop.registerObserver(customer);
     }
 
@@ -90,7 +94,8 @@ public class CoffeeShopFacade {
      * Note that customers are automatically removed as observers when their orders are fulfilled, so this method is typically used for manual unsubscription or cleanup.
      * @param customer the customer to remove
      */
-    public void removeCustomer(OrderObserver customer) {
+    public void removeCustomer(@NotNull OrderObserver customer) {
+        Objects.requireNonNull(customer, "Customer observer cannot be null");
         coffeeShop.removeObserver(customer);
     }
 
@@ -108,7 +113,10 @@ public class CoffeeShopFacade {
      * @param extras   optional extras: "milk", "sugar", "whipped_cream"
      * @return the placed Order
      */
-    public Order placeOrder(Customer customer, CoffeeCreator creator, String... extras) {
+    public @NotNull Order placeOrder(@NotNull Customer customer, @NotNull CoffeeCreator creator, @NotNull String... extras) {
+        Objects.requireNonNull(customer, "Customer cannot be null");
+        Objects.requireNonNull(creator, "Coffee creator cannot be null");
+        Objects.requireNonNull(extras, "Extras cannot be null");
         // Factory Method — create the base coffee
         Coffee coffee = creator.createCoffee();
 
@@ -135,7 +143,9 @@ public class CoffeeShopFacade {
      * @param coffee   the fully composed coffee
      * @return the placed Order
      */
-    public Order placeOrder(Customer customer, Coffee coffee) {
+    public @NotNull Order placeOrder(@NotNull Customer customer, @NotNull Coffee coffee) {
+        Objects.requireNonNull(customer, "Customer cannot be null");
+        Objects.requireNonNull(coffee, "Coffee cannot be null");
         Order order = new Order(customer, coffee,  coffeeShop.nextOrderId());
         invoker.executeCommand(new PlaceOrderCommand(order));
         return order;
@@ -153,7 +163,8 @@ public class CoffeeShopFacade {
      *
      * @param order the order to process
      */
-    public void processOrder(Order order) {
+    public void processOrder(@NotNull Order order) {
+        Objects.requireNonNull(order, "Order cannot be null");
         // Template Method — prepare the coffee
         invoker.executeCommand(new PrepareOrderCommand(order));
 
@@ -175,7 +186,8 @@ public class CoffeeShopFacade {
      * @param previousOrder the order to clone
      * @return the new cloned and processed Order
      */
-    public Order reorder(Order previousOrder) {
+    public @NotNull Order reorder(@NotNull Order previousOrder) {
+        Objects.requireNonNull(previousOrder, "Previous order cannot be null");
         Order clonedOrder = previousOrder.cloneOrder();
         invoker.executeCommand(new PlaceOrderCommand(clonedOrder));
         processOrder(clonedOrder);
@@ -190,7 +202,9 @@ public class CoffeeShopFacade {
      * @param newCustomer   the customer who wants the same coffee
      * @return the new cloned and processed Order
      */
-    public Order reorderForAnotherCustomer(Order previousOrder, Customer newCustomer) {
+    public @NotNull Order reorderForAnotherCustomer(@NotNull Order previousOrder, @NotNull Customer newCustomer) {
+        Objects.requireNonNull(previousOrder, "Previous order cannot be null");
+        Objects.requireNonNull(newCustomer, "New customer cannot be null");
         Order clonedOrder = previousOrder.cloneOrder(newCustomer);
         invoker.executeCommand(new PlaceOrderCommand(clonedOrder));
         processOrder(clonedOrder);
@@ -201,8 +215,8 @@ public class CoffeeShopFacade {
     // Payment Gateway Management (Adapter)
     // ===============================================================
 
-    public void setPaymentGateway(PaymentGateway paymentGateway) {
-        this.paymentGateway = paymentGateway;
+    public void setPaymentGateway(@NotNull PaymentGateway paymentGateway) {
+        this.paymentGateway = Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
     }
 
 
@@ -227,7 +241,7 @@ public class CoffeeShopFacade {
      *
      * @return unmodifiable list of all orders
      */
-    public List<Order> getAllOrders() {
+    public @NotNull List<Order> getAllOrders() {
         return coffeeShop.getOrders();
     }
 
@@ -245,7 +259,7 @@ public class CoffeeShopFacade {
      *
      * @return the order invoker
      */
-    public OrderInvoker getInvoker() {
+    public @NotNull OrderInvoker getInvoker() {
         return invoker;
     }
 
@@ -260,8 +274,9 @@ public class CoffeeShopFacade {
      * @param extras the extras to apply: "milk", "sugar", "whippedcream"
      * @return the decorated coffee
      */
-    private Coffee applyExtras(Coffee coffee, String... extras) {
+    private @NotNull Coffee applyExtras(@NotNull Coffee coffee, @NotNull String... extras) {
         for (String extra : extras) {
+            Objects.requireNonNull(extra, "Extra cannot be null");
             coffee = switch (extra.toLowerCase()) {
                 case "milk" -> new MilkDecorator(coffee);
                 case "sugar" -> new SugarDecorator(coffee);

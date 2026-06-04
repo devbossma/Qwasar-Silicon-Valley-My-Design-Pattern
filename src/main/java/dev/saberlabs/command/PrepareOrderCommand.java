@@ -4,6 +4,9 @@ package dev.saberlabs.command;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.singleton.CoffeeShop;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
 
 /**
  * Pattern 8: COMMAND (Concrete Command)
@@ -16,8 +19,8 @@ public class PrepareOrderCommand implements Command {
     private final Order order;
     private OrderStatus previousStatus;
 
-    public PrepareOrderCommand( Order order) {
-        this.order = order;
+    public PrepareOrderCommand(@NotNull Order order) {
+        this.order = Objects.requireNonNull(order, "Order cannot be null");
     }
 
     @Override

@@ -4,21 +4,35 @@ import dev.saberlabs.models.Coffee;
 
 public class FactoryMethodDemo {
 
-    public static void run() {
+    public static void main() {
+        FactoryMethodDemo demo = new FactoryMethodDemo();
+        demo.run();
+    }
+
+    public void run() {
         System.out.println("=== 2. FACTORY METHOD — Create coffees without knowing concrete classes ===");
 
-        // Client code only depends on the CoffeeCreator abstraction
-        CoffeeCreator creator = new EspressoCreator();
-        Coffee espresso = creator.createCoffee();
+        // Create different types of coffee using the factory method without directly instantiating their classes.
+        Coffee espresso = createCoffee(new EspressoCreator());
         System.out.printf("Espresso   : %s — $%.2f%n", espresso.getDescription(), espresso.getCost());
 
-        creator = new CappuccinoCreator();
-        Coffee cappuccino = creator.createCoffee();
+
+        Coffee cappuccino = createCoffee(new CappuccinoCreator());
         System.out.printf("Cappuccino : %s — $%.2f%n", cappuccino.getDescription(), cappuccino.getCost());
 
-        creator = new LatteCreator();
-        Coffee latte = creator.createCoffee();
+
+        Coffee latte = createCoffee(new LatteCreator());
         System.out.printf("Latte      : %s — $%.2f%n", latte.getDescription(), latte.getCost());
-        System.out.println();
+
+        System.out.println("=== End of Factory Method Demo ===\n");
+    }
+
+    /**
+     * This method Demonstrate the Client code that uses the Factory Method pattern to create coffee objects without knowing their concrete classes.
+     * @param cc the CoffeeCreator instance that defines the factory method to create a specific type of coffee
+     * @return the created Coffee object
+     */
+    private Coffee createCoffee(CoffeeCreator cc) {
+        return cc.createCoffee();
     }
 }

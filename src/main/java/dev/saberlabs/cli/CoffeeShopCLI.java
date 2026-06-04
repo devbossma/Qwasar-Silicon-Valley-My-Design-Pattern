@@ -35,7 +35,7 @@ public class CoffeeShopCLI {
 
     public CoffeeShopCLI() {
         this.scanner = new Scanner(System.in);
-        this.facade = new CoffeeShopFacade(null); // no default gateway - set at checkout
+        this.facade = new CoffeeShopFacade(new CashPaymentAdapter(new CashPaymentService())); // no default gateway - set at checkout
         this.customers = new HashMap<>();
         this.currentCustomer = null;
     }
@@ -117,7 +117,7 @@ public class CoffeeShopCLI {
         System.out.println();
         System.out.println(SEPARATOR);
         System.out.printf("  Total orders served: %d%n", facade.getOrderCount());
-        System.out.println("  Thank you for visiting Saber Labs Coffee Shop!");
+        System.out.println("☕  Thank you for visiting QWASAR COFFEE SHOP  ☕");
         System.out.println(SEPARATOR);
         System.out.println();
     }

@@ -1,7 +1,7 @@
 package dev.saberlabs.adapter;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Pattern 9: ADAPTER (Adapter class)
@@ -43,10 +43,10 @@ public class CashPaymentAdapter implements PaymentGateway {
     private final CashPaymentService cashService;
 
     /** Tracks payment status per order ID for later retrieval. */
-    private final Map<String, PaymentStatus> paymentHistory = new HashMap<>();
+    private final Map<String, PaymentStatus> paymentHistory = new ConcurrentHashMap<>();
 
     /** Tracks change owed per order ID for the cashier to return to the customer. */
-    private final Map<String, Double> changeHistory = new HashMap<>();
+    private final Map<String, Double> changeHistory = new ConcurrentHashMap<>();
 
     /**
      * Creates a new CashPaymentAdapter wrapping the given cash register service.

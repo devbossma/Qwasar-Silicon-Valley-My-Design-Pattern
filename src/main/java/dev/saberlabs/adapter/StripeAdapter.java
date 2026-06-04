@@ -1,8 +1,8 @@
 package dev.saberlabs.adapter;
 
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Pattern 9: ADAPTER (Adapter class)
@@ -19,7 +19,7 @@ public class StripeAdapter implements PaymentGateway{
      */
     private final StripePaymentService stripeGateway;
 
-    private final Map<String, PaymentStatus> paymentHistory = new HashMap<>();
+    private final Map<String, PaymentStatus> paymentHistory = new ConcurrentHashMap<>();
 
     public StripeAdapter(StripePaymentService paymentGateway) {
         this.stripeGateway = paymentGateway;

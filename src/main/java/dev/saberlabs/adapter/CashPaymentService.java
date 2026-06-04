@@ -30,7 +30,7 @@ public class CashPaymentService {
      *
      * @param amount the cash amount the customer hands over in dollars
      */
-    public void setAmountReceived(double amount) {
+    public synchronized void setAmountReceived(double amount) {
         this.amountReceived = amount;
     }
 
@@ -48,7 +48,7 @@ public class CashPaymentService {
      * @param amountDue the total amount the customer owes in dollars
      * @return the change to give back (>= 0), or -1 if insufficient cash
      */
-    public double collectCash(double amountDue) {
+    public synchronized double collectCash(double amountDue) {
         if (amountReceived < amountDue) {
             System.out.printf("[CashRegister] Insufficient cash. Due: $%.2f, Received: $%.2f%n",
                     amountDue, amountReceived);
@@ -65,7 +65,7 @@ public class CashPaymentService {
      *
      * @return the cumulative cash register total in dollars
      */
-    public double getCashRegisterTotal() {
+    public synchronized double getCashRegisterTotal() {
         return cashRegister;
     }
 }

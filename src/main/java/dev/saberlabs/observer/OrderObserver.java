@@ -2,6 +2,7 @@ package dev.saberlabs.observer;
 
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Pattern 7: OBSERVER (Observer interface)
@@ -11,5 +12,5 @@ import dev.saberlabs.models.OrderStatus;
  */
 public interface OrderObserver {
 
-    void update(Order order, OrderStatus event);
+    void update(@NotNull Order order, @NotNull OrderStatus event);
 }

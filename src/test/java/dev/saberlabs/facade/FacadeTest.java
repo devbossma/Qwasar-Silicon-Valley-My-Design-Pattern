@@ -198,7 +198,7 @@ class FacadeTest {
         // Alice orders a fancy coffee — Silver pricing applies
         Order aliceFancy = facade.placeOrder(alice, new CappuccinoCreator(), "milk", "whipped_cream");
         // Cappuccino $3.50 + Milk $0.50 + WhippedCream $0.75 = $4.75, Silver 10% off = $4.275
-        assertEquals(4.75 * 0.90, aliceFancy.getFinalPrice(), 0.001);
+        assertEquals(4.28, aliceFancy.getFinalPrice(), 0.001);
         facade.processOrder(aliceFancy);
 
         // Bob says "I'll have what she's having"

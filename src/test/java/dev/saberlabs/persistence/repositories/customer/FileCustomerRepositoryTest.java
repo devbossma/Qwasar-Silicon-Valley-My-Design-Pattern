@@ -49,9 +49,10 @@ class FileCustomerRepositoryTest {
         @Test
         @DisplayName("upserts — overwrites customer with same ID")
         void upsertOverwritesExisting() {
-            repository.save(buildCustomer("CUST-1"));
+            repository.save(buildCustomer("1"));
             StoredCustomer updated = new StoredCustomer(
-                    "CUST-1", "Alice Gold", 15, LoyaltyTier.GOLD);
+                    "CUST-1", "Alice Gold", 15, LoyaltyTier.GOLD); // totalOrders then LoyaltyTier
+
             repository.save(updated);
 
             assertEquals(1, repository.findAll().size());

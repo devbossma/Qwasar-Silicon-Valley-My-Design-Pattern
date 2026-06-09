@@ -296,7 +296,7 @@ class CoffeeShopPersistenceFacadeTest {
             Customer alice = facade.createCustomer("Alice");
             facade.registerCustomer(alice);
             Order order = facade.placeOrder(alice, new EspressoCreator(),
-                    "milk", "sugar", "whipped");
+                    "milk", "sugar", "whipped_cream");
             String originalDescription = order.getCoffee().getDescription();
             double originalCost = order.getCoffee().getCost();
             facade.processOrder(order);
@@ -360,21 +360,21 @@ class CoffeeShopPersistenceFacadeTest {
         @Test
         @DisplayName("throws on null CoffeeShop")
         void throwsOnNullCoffeeShop() {
-            assertThrows(NullPointerException.class,
+            assertThrows(IllegalArgumentException.class,
                     () -> new CoffeeShopPersistenceFacade(null, customerRepo, orderRepo));
         }
 
         @Test
         @DisplayName("throws on null CustomerRepository")
         void throwsOnNullCustomerRepository() {
-            assertThrows(NullPointerException.class,
+            assertThrows(IllegalArgumentException.class,
                     () -> new CoffeeShopPersistenceFacade(shop, null, orderRepo));
         }
 
         @Test
         @DisplayName("throws on null OrderRepository")
         void throwsOnNullOrderRepository() {
-            assertThrows(NullPointerException.class,
+            assertThrows(IllegalArgumentException.class,
                     () -> new CoffeeShopPersistenceFacade(shop, customerRepo, null));
         }
     }

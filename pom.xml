@@ -27,6 +27,7 @@
             <scope>test</scope>
         </dependency>
         <!-- Source: https://mvnrepository.com/artifact/org.jetbrains/annotations -->
+        <!-- Provides annotations like @NotNull and @Nullable for better code quality and static analysis -->
         <dependency>
             <groupId>org.jetbrains</groupId>
             <artifactId>annotations</artifactId>

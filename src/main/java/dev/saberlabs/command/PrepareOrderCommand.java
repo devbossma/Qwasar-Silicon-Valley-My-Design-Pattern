@@ -26,18 +26,18 @@ public class PrepareOrderCommand implements Command {
     @Override
     public void execute() {
         previousStatus = order.getStatus();
-        System.out.println("["+getCommandName()+"]  Preparing \"" + order.getCoffee().getDescription() + "\" For "+ order.getCustomer().getName()+"! ...");
         order.setStatus(OrderStatus.PREPARING);
+        System.out.println("["+getCommandName()+"]  Preparing \"" + order.getCoffee().getDescription() + "\" For "+ order.getCustomer().getName()+"! ...");
         order.getCoffee().getPreparation().prepareCoffee();
-        System.out.println("["+getCommandName()+"] Order is being prepared: " + order);
         order.setStatus(OrderStatus.READY);
+        System.out.println("["+getCommandName()+"] Order is being prepared: " + order);
     }
 
     @Override
     public void undo() {
         order.setStatus(previousStatus);
-        CoffeeShop.getInstance().removeObserver(order.getCustomer());
         System.out.println("["+getCommandName()+"] Reverted to: " + previousStatus);
+        CoffeeShop.getInstance().removeObserver(order.getCustomer());
     }
 
     @Override

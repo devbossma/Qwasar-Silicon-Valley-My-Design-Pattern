@@ -1,5 +1,6 @@
 package dev.saberlabs.persistence.records;
 
+import dev.saberlabs.models.LoyaltyTier;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -14,6 +15,6 @@ public record StoredCustomer(
         @NotNull String id,
         @NotNull String name,
         int totalOrders,
-        @NotNull String loyaltyTier
+        @NotNull LoyaltyTier loyaltyTier
 ) {
 }

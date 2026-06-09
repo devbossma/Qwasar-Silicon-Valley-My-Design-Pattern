@@ -1,5 +1,8 @@
 package dev.saberlabs.strategy;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 /**
  * Pattern 6: STRATEGY (Concrete Strategy C))
  *
@@ -11,7 +14,10 @@ public class GoldMemberPricing implements PricingStrategy {
 
     @Override
     public double calculatePrice(double baseCost) {
-        return baseCost * (1 - DISCOUNT);
+        BigDecimal raw = BigDecimal.valueOf(baseCost)
+                .multiply(BigDecimal.valueOf(1 - DISCOUNT));
+
+        return raw.setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 
     @Override

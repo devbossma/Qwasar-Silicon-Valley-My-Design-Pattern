@@ -12,7 +12,12 @@ import dev.saberlabs.factory.LatteCreator;
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
+import dev.saberlabs.persistence.CoffeeShopPersistenceFacade;
+import dev.saberlabs.persistence.PersistenceException;
+import dev.saberlabs.persistence.records.RestoredCoffeeShopState;
+import dev.saberlabs.singleton.CoffeeShop;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +33,10 @@ public class CoffeeShopCLI {
     private static final String SEPARATOR = "════════════════════════════════════════════════════════";
     private static final String THIN_SEP  = "────────────────────────────────────────────────────────";
 
+    // Data directory for persistence.
+    private static final Path DATA_DIR = Path.of("data", "coffee-shop");
+    private final CoffeeShopPersistenceFacade persistence;
+
     private final Scanner scanner;
     private final CoffeeShopFacade facade;
     private final Map<String, Customer> customers;
@@ -38,6 +47,7 @@ public class CoffeeShopCLI {
         this.facade = new CoffeeShopFacade(new CashPaymentAdapter(new CashPaymentService())); // no default gateway - set at checkout
         this.customers = new HashMap<>();
         this.currentCustomer = null;
+        this.persistence = new CoffeeShopPersistenceFacade(DATA_DIR);
     }
 
     static void main(String[] args) {
@@ -51,6 +61,7 @@ public class CoffeeShopCLI {
 
     public void run() {
         printBanner();
+        offerRestore();
 
         boolean running = true;
         while (running) {
@@ -67,7 +78,10 @@ public class CoffeeShopCLI {
                 case 7 -> handleViewCustomerInfo();
                 case 8 -> handleUndoLastAction();
                 case 9 -> handleViewCommandHistory();
+                case 10 -> handleSaveState();
+                case 11 -> handleRestoreState();
                 case 0 -> {
+                    handleSaveStateOnExit();
                     printGoodbye();
                     running = false;
                 }
@@ -109,7 +123,9 @@ public class CoffeeShopCLI {
         System.out.println("  7. View Customer Info");
         System.out.println("  8. Undo Last Action");
         System.out.println("  9. View Command History");
-        System.out.println("  0. Exit");
+        System.out.println("  10. Save State");
+        System.out.println("  11. Restore State");
+        System.out.println("  0. Exit (auto-saves)");
         System.out.println(THIN_SEP);
     }
 
@@ -595,6 +611,81 @@ public class CoffeeShopCLI {
             return Double.parseDouble(scanner.nextLine().trim());
         } catch (NumberFormatException e) {
             return 0.0;
+        }
+    }
+
+    // ================================================================
+    // Persistence Handlers
+    // ================================================================
+
+    private void offerRestore() {
+        System.out.println("  Looking for saved state...");
+        try {
+            RestoredCoffeeShopState restored = persistence.restoreState();
+            if (!restored.orders().isEmpty() || !restored.customers().isEmpty()) {
+                System.out.printf("  Found %d orders and %d customers from previous session.%n",
+                        restored.orders().size(), restored.customers().size());
+                String choice = readString("  Restore previous session? (y/n): ");
+                if (choice.equalsIgnoreCase("y")) {
+                    // Re-register customers as observers
+                    restored.customers().forEach(c -> {
+                        customers.put(c.getId(), c);
+                        facade.registerCustomer(c);
+                    });
+                    System.out.printf("  ✓ Restored %d orders and %d customers.%n%n",
+                            restored.orders().size(), restored.customers().size());
+                } else {
+                    persistence.clearSavedState();
+                    CoffeeShop.getInstance().clearOrders();
+                    System.out.println("  Previous session discarded.\n");
+                }
+            } else {
+                System.out.println("  No saved state found. Starting fresh.\n");
+            }
+        } catch (PersistenceException e) {
+            System.out.println("  Could not read saved state. Starting fresh.\n");
+        }
+    }
+
+    private void handleSaveState() {
+        try {
+            persistence.saveState();
+            System.out.printf("  ✓ State saved — %d orders, %d customers.%n%n",
+                    CoffeeShop.getInstance().getOrderCount(), customers.size());
+        } catch (PersistenceException e) {
+            System.out.println("  ✗ Save failed: " + e.getMessage() + "\n");
+        }
+    }
+
+    private void handleRestoreState() {
+        String confirm = readString("  This will overwrite current session. Continue? (y/n): ");
+        if (!confirm.equalsIgnoreCase("y")) {
+            System.out.println("  Restore cancelled.\n");
+            return;
+        }
+        try {
+            customers.clear();
+            RestoredCoffeeShopState restored = persistence.restoreState();
+            restored.customers().forEach(c -> {
+                customers.put(c.getId(), c);
+                facade.registerCustomer(c);
+            });
+            currentCustomer = null;
+            System.out.printf("  ✓ Restored %d orders and %d customers.%n%n",
+                    restored.orders().size(), restored.customers().size());
+        } catch (PersistenceException e) {
+            System.out.println("  ✗ Restore failed: " + e.getMessage() + "\n");
+        }
+    }
+
+    private void handleSaveStateOnExit() {
+        if (CoffeeShop.getInstance().getOrderCount() > 0) {
+            try {
+                persistence.saveState();
+                System.out.println("  ✓ Session saved automatically.");
+            } catch (PersistenceException e) {
+                System.out.println("  ✗ Auto-save failed: " + e.getMessage());
+            }
         }
     }
 }

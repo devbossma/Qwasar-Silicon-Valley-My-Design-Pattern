@@ -1,4 +1,4 @@
-package dev.saberlabs.persistence.repositories.implimentatioins.file;
+package dev.saberlabs.persistence.repositories.implementations.file;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,9 +38,9 @@ public class FileCustomerRepository implements CustomerRepository {
     @Override
     public synchronized void save(@NotNull StoredCustomer customer) {
         Objects.requireNonNull(customer, "Customer cannot be null");
-        List<StoredCustomer> customers = findAll().stream()
+        List<StoredCustomer> customers = new ArrayList<>(findAll().stream()
                 .filter(existing -> !existing.id().equals(customer.id()))
-                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+                .toList());
         customers.add(customer);
         write(customers);
     }

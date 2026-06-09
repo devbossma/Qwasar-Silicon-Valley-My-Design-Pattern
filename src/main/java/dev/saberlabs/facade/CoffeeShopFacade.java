@@ -168,11 +168,11 @@ public class CoffeeShopFacade {
         // Template Method — prepare the coffee
         invoker.executeCommand(new PrepareOrderCommand(order));
 
-        // Adapter — collect payment
-        invoker.executeCommand(new PayOrderCommand(order, paymentGateway));
-
         // Observer + Strategy — fulfill and increment loyalty
         invoker.executeCommand(new FulfillOrderCommand(order));
+
+        // Adapter — collect payment
+        invoker.executeCommand(new PayOrderCommand(order, paymentGateway));
     }
 
     // ================================================================

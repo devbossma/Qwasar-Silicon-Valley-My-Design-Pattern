@@ -26,6 +26,7 @@ public class CoffeeShop {
 
     // Volatile variable to ensure visibility of changes across threads and prevent instruction reordering issues.
     private static volatile CoffeeShop INSTANCE;
+    // Regular expression pattern to extract trailing numbers from IDs for syncing counters after restoring state.
     private static final Pattern TRAILING_NUMBER = Pattern.compile("(\\d+)$");
 
     /**
@@ -90,8 +91,9 @@ public class CoffeeShop {
         synchronized (orders) {
             orders.add(order);
         }
-        System.out.println("[CoffeeShop] New Order Placed: " + order);
         order.setStatus(OrderStatus.PLACED);
+        System.out.println("[CoffeeShop] New Order Placed: " + order);
+
     }
 
     /**
@@ -132,9 +134,11 @@ public class CoffeeShop {
     }
 
     /**
-     * Restores persisted orders without replaying placement notifications.
+     * Restores orders from persistence layer after a restart.
+     * Bypasses setStatus to avoid triggering Observer notifications
+     * and loyalty increments on already-processed orders.
      *
-     * @param restoredOrders the orders loaded from persistence
+     * @param restoredOrders the orders to restore
      */
     public void restoreOrders(@NotNull List<Order> restoredOrders) {
         Objects.requireNonNull(restoredOrders, "Restored orders cannot be null");
@@ -143,6 +147,8 @@ public class CoffeeShop {
             orders.addAll(restoredOrders);
         }
         syncOrderCounter(restoredOrders);
+        System.out.printf("[CoffeeShop] Restored %d orders from persistence.%n",
+                restoredOrders.size());
     }
 
     /**
@@ -162,6 +168,7 @@ public class CoffeeShop {
 
         // Update the customerIdCounter to be at least as high as the maximum restored customer ID to avoid generating duplicate IDs for new customers.
         customerIdCounter.updateAndGet(current -> Math.max(current, maxCustomerId));
+        System.out.printf("[CoffeeShop] Customer counter synced to %d.%n", maxCustomerId);
     }
 
     /**

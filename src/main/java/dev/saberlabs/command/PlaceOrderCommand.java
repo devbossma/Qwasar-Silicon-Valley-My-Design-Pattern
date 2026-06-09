@@ -32,6 +32,7 @@ public class PlaceOrderCommand implements Command {
     public void undo() {
         order.setStatus(OrderStatus.CANCELLED);
         System.out.println("["+getCommandName()+"] Order cancelled: " + order);
+        CoffeeShop.getInstance().removeObserver(order.getCustomer());
     }
 
     @Override

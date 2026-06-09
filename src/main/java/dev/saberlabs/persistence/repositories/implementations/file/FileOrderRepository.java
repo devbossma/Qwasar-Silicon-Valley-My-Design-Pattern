@@ -1,4 +1,4 @@
-package dev.saberlabs.persistence.repositories.implimentatioins.file;
+package dev.saberlabs.persistence.repositories.implementations.file;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,8 +20,11 @@ import java.util.Optional;
  */
 public class FileOrderRepository implements OrderRepository {
 
-    private static final TypeReference<List<StoredOrder>> ORDER_LIST = new TypeReference<>() {
-    };
+    /**
+     * In Java, TypeReference is a utility class primarily provided by the Jackson library to capture, retain,
+     * and pass generic type information at runtime, bypassing the limitations of Java's type erasure
+     */
+    private static final TypeReference<List<StoredOrder>> ORDER_LIST = new TypeReference<>() {};
 
     private final Path filePath;
     private final ObjectMapper objectMapper;
@@ -37,9 +41,9 @@ public class FileOrderRepository implements OrderRepository {
     @Override
     public synchronized void save(@NotNull StoredOrder order) {
         Objects.requireNonNull(order, "Order cannot be null");
-        List<StoredOrder> orders = findAll().stream()
+        List<StoredOrder> orders = new ArrayList<>(findAll().stream()
                 .filter(existing -> !existing.orderId().equals(order.orderId()))
-                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+                .toList());
         orders.add(order);
         write(orders);
     }
@@ -57,7 +61,7 @@ public class FileOrderRepository implements OrderRepository {
         }
         try {
             return objectMapper.readValue(filePath.toFile(), ORDER_LIST);
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new PersistenceException("Could not read orders from " + filePath, e);
         }
     }

@@ -28,7 +28,7 @@ public class OrderPersistenceMapper {
 
     public @NotNull StoredOrder toStoredOrder(@NotNull Order order) {
         Objects.requireNonNull(order, "Order cannot be null");
-        String status = order.getStatus() == null ? null : order.getStatus().name();
+        OrderStatus status = order.getStatus() == null ? null : order.getStatus();
         return new StoredOrder(
                 order.getOrderId(),
                 order.getCustomer().getId(),
@@ -54,7 +54,7 @@ public class OrderPersistenceMapper {
         Order order = new Order(customer, coffee, storedOrder.orderId());
         order.setFinalPrice(storedOrder.finalPrice());
         if (storedOrder.status() != null) {
-            order.restoreStatus(OrderStatus.valueOf(storedOrder.status()));
+            order.restoreStatus(storedOrder.status());
         }
         return order;
     }

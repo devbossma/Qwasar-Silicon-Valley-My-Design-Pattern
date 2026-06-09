@@ -1,5 +1,6 @@
 package dev.saberlabs.persistence.records;
 
+import dev.saberlabs.models.OrderStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -12,11 +13,11 @@ import org.jetbrains.annotations.Nullable;
  * @param finalPrice price after strategy discount
  * @param status     persisted status name, or null if unset
  */
-public record StoredOrder(
+public record  StoredOrder(
         @NotNull String orderId,
         @NotNull String customerId,
         @NotNull StoredCoffee coffee,
         double finalPrice,
-        @Nullable String status
+        @Nullable OrderStatus status
 ) {
 }

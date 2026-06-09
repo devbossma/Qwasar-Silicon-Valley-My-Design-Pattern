@@ -1,4 +1,4 @@
-package dev.saberlabs.persistence.repositories.implimentatioins.memory;
+package dev.saberlabs.persistence.repositories.implementations.memory;
 
 import dev.saberlabs.persistence.records.StoredCustomer;
 import dev.saberlabs.persistence.repositories.CustomerRepository;

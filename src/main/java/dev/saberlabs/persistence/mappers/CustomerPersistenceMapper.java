@@ -17,7 +17,7 @@ public class CustomerPersistenceMapper {
                 customer.getId(),
                 customer.getName(),
                 customer.getTotalOrders(),
-                customer.getLoyaltyTier().name()
+                customer.getLoyaltyTier()
         );
     }
 

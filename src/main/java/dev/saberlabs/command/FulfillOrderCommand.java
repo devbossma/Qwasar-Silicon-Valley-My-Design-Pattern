@@ -26,8 +26,8 @@ public class FulfillOrderCommand implements Command {
     @Override
     public void execute() {
         previousStatus = order.getStatus();
-        System.out.println("["+getCommandName()+"] Order fulfilled: " + order);
         order.setStatus(OrderStatus.FULFILLED);
+        System.out.println("["+getCommandName()+"] Order fulfilled: " + order);
         CoffeeShop.getInstance().removeObserver(order.getCustomer());
     }
 

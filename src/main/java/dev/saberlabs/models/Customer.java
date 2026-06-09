@@ -77,8 +77,8 @@ public class Customer implements OrderObserver {
      * @param count the updated total number of orders
      */
     private synchronized void recalculateTier(int count) {
-        if (count > 10) loyaltyTier = LoyaltyTier.GOLD;
-        else if (count > 5) loyaltyTier = LoyaltyTier.SILVER;
+        if (count >= 10) loyaltyTier = LoyaltyTier.GOLD;
+        else if (count >= 5) loyaltyTier = LoyaltyTier.SILVER;
         else loyaltyTier = LoyaltyTier.REGULAR;
     }
 

@@ -10,15 +10,13 @@ import dev.saberlabs.models.LoyaltyTier;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.persistence.records.RestoredCoffeeShopState;
-import dev.saberlabs.persistence.repositories.implementations.memory.InMemoryCustomerRepository;
-import dev.saberlabs.persistence.repositories.implementations.memory.InMemoryOrderRepository;
+import dev.saberlabs.repository.implementations.memory.InMemoryCustomerRepository;
+import dev.saberlabs.repository.implementations.memory.InMemoryOrderRepository;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -5,10 +5,10 @@ import dev.saberlabs.models.Order;
 import dev.saberlabs.persistence.records.RestoredCoffeeShopState;
 import dev.saberlabs.persistence.mappers.CustomerPersistenceMapper;
 import dev.saberlabs.persistence.mappers.OrderPersistenceMapper;
-import dev.saberlabs.persistence.repositories.implementations.file.FileCustomerRepository;
-import dev.saberlabs.persistence.repositories.implementations.file.FileOrderRepository;
-import dev.saberlabs.persistence.repositories.CustomerRepository;
-import dev.saberlabs.persistence.repositories.OrderRepository;
+import dev.saberlabs.repository.implementations.file.FileCustomerRepository;
+import dev.saberlabs.repository.implementations.file.FileOrderRepository;
+import dev.saberlabs.repository.CustomerRepository;
+import dev.saberlabs.repository.OrderRepository;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 

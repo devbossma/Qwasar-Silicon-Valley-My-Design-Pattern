@@ -1,10 +1,10 @@
-package dev.saberlabs.persistence.repositories.implementations.file;
+package dev.saberlabs.repository.implementations.file;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.saberlabs.persistence.PersistenceException;
 import dev.saberlabs.persistence.records.StoredCustomer;
-import dev.saberlabs.persistence.repositories.CustomerRepository;
+import dev.saberlabs.repository.CustomerRepository;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;

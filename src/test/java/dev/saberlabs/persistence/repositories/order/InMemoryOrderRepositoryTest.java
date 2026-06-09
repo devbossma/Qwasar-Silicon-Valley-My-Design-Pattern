@@ -3,7 +3,7 @@ package dev.saberlabs.persistence.repositories.order;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.persistence.records.StoredCoffee;
 import dev.saberlabs.persistence.records.StoredOrder;
-import dev.saberlabs.persistence.repositories.implementations.memory.InMemoryOrderRepository;
+import dev.saberlabs.repository.implementations.memory.InMemoryOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

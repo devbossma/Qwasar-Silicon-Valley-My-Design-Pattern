@@ -1,4 +1,4 @@
-package dev.saberlabs.persistence.repositories;
+package dev.saberlabs.repository;
 
 import dev.saberlabs.persistence.records.StoredOrder;
 import org.jetbrains.annotations.NotNull;

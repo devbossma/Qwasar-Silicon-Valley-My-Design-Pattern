@@ -1,7 +1,7 @@
-package dev.saberlabs.persistence.repositories.implementations.memory;
+package dev.saberlabs.repository.implementations.memory;
 
 import dev.saberlabs.persistence.records.StoredCustomer;
-import dev.saberlabs.persistence.repositories.CustomerRepository;
+import dev.saberlabs.repository.CustomerRepository;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;

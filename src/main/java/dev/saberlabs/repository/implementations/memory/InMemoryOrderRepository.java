@@ -1,7 +1,7 @@
-package dev.saberlabs.persistence.repositories.implementations.memory;
+package dev.saberlabs.repository.implementations.memory;
 
 import dev.saberlabs.persistence.records.StoredOrder;
-import dev.saberlabs.persistence.repositories.OrderRepository;
+import dev.saberlabs.repository.OrderRepository;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.LinkedHashMap;

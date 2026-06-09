@@ -2,7 +2,7 @@ package dev.saberlabs.persistence.repositories.customer;
 
 import dev.saberlabs.models.LoyaltyTier;
 import dev.saberlabs.persistence.records.StoredCustomer;
-import dev.saberlabs.persistence.repositories.implementations.memory.InMemoryCustomerRepository;
+import dev.saberlabs.repository.implementations.memory.InMemoryCustomerRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

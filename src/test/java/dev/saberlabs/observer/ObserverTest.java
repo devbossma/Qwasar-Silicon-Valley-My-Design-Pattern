@@ -7,6 +7,7 @@ import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.singleton.CoffeeShop;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class ObserverTest {
         final List<Order> receivedOrders = new ArrayList<>();
 
         @Override
-        public void update(Order order, OrderStatus event) {
+        public void update(@NotNull Order order, @NotNull OrderStatus event) {
             receivedOrders.add(order);
             receivedEvents.add(event);
         }

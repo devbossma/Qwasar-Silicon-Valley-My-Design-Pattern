@@ -7,6 +7,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Represents a coffee shop customer.
  * Loyalty tier is automatically calculated based on total orders placed.
@@ -37,8 +39,8 @@ public class Customer implements OrderObserver {
      */
     public Customer(@NotNull String id, @NotNull String name) {
         // Validate that ID and name are not null to prevent issues in collections and notifications.
-        Objects.requireNonNull(id, "Customer ID cannot be null");
-        Objects.requireNonNull(name, "Customer name cannot be null");
+        requireNonNull(id, "Customer ID cannot be null");
+        requireNonNull(name, "Customer name cannot be null");
         
         this.id = id;
         this.name = name;
@@ -115,6 +117,8 @@ public class Customer implements OrderObserver {
     // Only prints messages for orders belonging to this customer.
     @Override
     public void update(@NotNull Order order, @NotNull OrderStatus event) {
+        requireNonNull(order, "Order cannot be null");
+        requireNonNull(event, "Order status cannot be null");
         if (order.getCustomer().equals(this) ) {
             switch (event) {
                 case PLACED -> System.out.println("[NOTIFICATION] "+ name +" Your order has been placed.");

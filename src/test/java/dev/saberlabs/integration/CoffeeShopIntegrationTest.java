@@ -10,6 +10,7 @@ import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -103,7 +104,7 @@ class CoffeeShopIntegrationTest {
         private final AtomicInteger notificationCount = new AtomicInteger();
 
         @Override
-        public void update(Order order, OrderStatus event) {
+        public void update(@NotNull Order order, @NotNull OrderStatus event) {
             notificationCount.incrementAndGet();
         }
     }

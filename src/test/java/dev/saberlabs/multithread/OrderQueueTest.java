@@ -4,6 +4,8 @@ package dev.saberlabs.multithread;
 import dev.saberlabs.models.Cappuccino;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
+import dev.saberlabs.singleton.CoffeeShop;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +20,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Order Queue Thread-Safety")
 public class OrderQueueTest {
+
+    @BeforeEach
+    void setUp() {
+        CoffeeShop.getInstance().clearOrders();
+    }
 
     // ------------------------------------------------------------------------
     // Single‑threaded tests

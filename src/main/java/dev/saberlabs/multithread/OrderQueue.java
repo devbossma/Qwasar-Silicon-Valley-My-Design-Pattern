@@ -16,8 +16,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * Consumers (Baristas) call {@link #dequeue()} to take orders.
  * *
  * Uses a fair {@link ReentrantLock} with two {@link Condition}s:
- * - {@code notFull}  — producers wait here when the queue is at capacity.
- * - {@code notEmpty} — consumers wait here when the queue is empty.
+ * - {@code notFull}  -- producers wait here when the queue is at capacity.
+ * - {@code notEmpty} -- consumers wait here when the queue is empty.
  * *
  * Why ReentrantLock over synchronized:
  * - Two separate Condition objects allow targeted signaling:
@@ -30,7 +30,7 @@ public class OrderQueue {
     private final Queue<Order> queue;
     private final int capacity;
 
-    /** Guards all queue state. Fair mode — longest-waiting thread goes first. */
+    /** Guards all queue state. Fair mode -- longest-waiting thread goes first. */
     private final ReentrantLock lock = new ReentrantLock(true);
 
     /** Signaled when the queue transitions from full --> not full. */
@@ -71,7 +71,7 @@ public class OrderQueue {
             // Wait until there is space in the queue to add the new order.
             // This loop handles spurious wakeups and ensures the condition is re-checked after being signaled.
             while (queue.size() == capacity) {
-                System.out.printf("[OrderQueue] Full (%d/%d) — %s waiting...%n",
+                System.out.printf("[OrderQueue] Full (%d/%d) -- %s waiting...%n",
                         queue.size(), capacity, order.getCustomer().getName());
                 notFull.await();
             }
@@ -100,7 +100,7 @@ public class OrderQueue {
         lock.lock();
         try {
             while (queue.isEmpty()) {
-                System.out.println("[OrderQueue] Empty — barista waiting...");
+                System.out.println("[OrderQueue] Empty -- barista waiting...");
                 notEmpty.await();
             }
             Order order = queue.poll();

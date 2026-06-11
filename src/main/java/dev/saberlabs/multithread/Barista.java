@@ -7,22 +7,22 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 
 /**
- * Barista — Consumer thread in the Producer-Consumer pattern.
- *
+ * Barista -- Consumer thread in the Producer-Consumer pattern.
+ * *
  * Each Barista runs in its own thread, continuously pulling orders
  * from the shared {@link OrderQueue}, preparing the coffee via
  * the Template Method pattern ({@code coffee.getPreparation().prepareCoffee()}),
- * and updating the order status — which triggers Observer notifications
+ * and updating the order status -- which triggers Observer notifications
  * and loyalty tier recalculation.
- *
+ * *
  * Shutdown contract:
  * - Call {@link #shutdown()} to signal the barista to stop.
  * - The barista finishes all orders already in the queue before exiting
- *   (graceful drain — no orders are lost).
+ *   (graceful drain -- no orders are lost).
  * - If blocked on an empty queue, interrupt the thread to unblock it.
- *
+ * *
  * Thread safety:
- * - {@code running} is {@code volatile} — the shutdown signal is visible
+ * - {@code running} is {@code volatile} -- the shutdown signal is visible
  *   immediately across threads without synchronization.
  * - {@code ordersCompleted} is only written by this barista's own thread,
  *   so no synchronization is needed.
@@ -52,15 +52,15 @@ public class Barista implements Runnable {
 
     @Override
     public void run() {
-        System.out.printf("[%s] On duty — ready to prepare orders.%n", name);
+        System.out.printf("[%s] On duty -- ready to prepare orders.%n", name);
 
         // Keep running while active OR while there are orders left to drain
         while (running || !orderQueue.isEmpty()) {
             try {
-                // CONSUMER — blocks here if queue is empty
+                // CONSUMER -- blocks here if queue is empty
                 Order order = orderQueue.dequeue();
 
-                // TEMPLATE METHOD — runs the coffee-specific preparation steps
+                // TEMPLATE METHOD -- runs the coffee-specific preparation steps
                 System.out.printf("[%s] Preparing: %s for %s...%n",
                         name,
                         order.getCoffee().getDescription(),
@@ -70,10 +70,10 @@ public class Barista implements Runnable {
                 // Simulate realistic preparation time (1–3 seconds)
                 Thread.sleep((long) (Math.random() * 2000) + 1000);
 
-                // OBSERVER — setStatus triggers notifyObservers via CoffeeShop
+                // OBSERVER -- setStatus triggers notifyObservers via CoffeeShop
                 order.setStatus(OrderStatus.READY);
 
-                // STRATEGY + OBSERVER — FULFILLED increments loyalty tier
+                // STRATEGY + OBSERVER -- FULFILLED increments loyalty tier
                 order.setStatus(OrderStatus.FULFILLED);
 
                 ordersCompleted++;
@@ -85,12 +85,12 @@ public class Barista implements Runnable {
             } catch (InterruptedException e) {
                 // Restore interrupted status and exit gracefully
                 Thread.currentThread().interrupt();
-                System.out.printf("[%s] Interrupted — shutting down.%n", name);
+                System.out.printf("[%s] Interrupted -- shutting down.%n", name);
                 break;
             }
         }
 
-        System.out.printf("[%s] Shift over — completed %d orders.%n",
+        System.out.printf("[%s] Shift over -- completed %d orders.%n",
                 name, ordersCompleted);
     }
 

@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("Barista — Consumer Thread")
+@DisplayName("Barista -- Consumer Thread")
 class BaristaTest {
 
     @BeforeEach
@@ -94,7 +94,7 @@ class BaristaTest {
         Thread thread = new Thread(barista, "Barista-1");
         thread.start();
 
-        // Wait for processing — preparation + sleep takes up to 5 seconds
+        // Wait for processing -- preparation + sleep takes up to 5 seconds
         Thread.sleep(5000);
 
         // Signal shutdown and wait for thread to finish
@@ -178,11 +178,11 @@ class BaristaTest {
         }, "Barista-1");
         thread.start();
 
-        // Barista is blocked — no orders yet
+        // Barista is blocked -- no orders yet
         Thread.sleep(1000);
         assertEquals(0, barista.getOrdersCompleted());
 
-        // Add an order — barista should wake up
+        // Add an order -- barista should wake up
         queue.enqueue(order);
 
         Thread.sleep(5000);
@@ -195,7 +195,7 @@ class BaristaTest {
     }
 
     // -----------------------------------------------------------------------
-    // Graceful shutdown — drain remaining orders
+    // Graceful shutdown -- drain remaining orders
     // -----------------------------------------------------------------------
 
     @Test
@@ -209,7 +209,7 @@ class BaristaTest {
         Thread thread = new Thread(barista, "Barista-1");
         thread.start();
 
-        // Signal shutdown immediately — barista should still drain
+        // Signal shutdown immediately -- barista should still drain
         barista.shutdown();
 
         thread.join(15000);
@@ -261,7 +261,7 @@ class BaristaTest {
         t1.start();
         t2.start();
 
-        // Wait for all orders — 6 × 3 seconds + buffer
+        // Wait for all orders -- 6 × 3 seconds + buffer
         Thread.sleep(20000);
 
         b1.shutdown();

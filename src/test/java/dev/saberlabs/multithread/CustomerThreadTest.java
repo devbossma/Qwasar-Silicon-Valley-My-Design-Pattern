@@ -5,21 +5,26 @@ import dev.saberlabs.factory.CoffeeCreator;
 import dev.saberlabs.factory.EspressoCreator;
 import dev.saberlabs.factory.LatteCreator;
 import dev.saberlabs.models.Customer;
+import dev.saberlabs.models.Order;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("CustomerThread -- Producer Thread")
+@DisplayName("CustomerThread --- Producer Thread")
 class CustomerThreadTest {
 
     private List<CoffeeCreator> menu;
+    private AtomicInteger idCounter;
 
     @BeforeEach
     void setUp() {
@@ -29,12 +34,37 @@ class CustomerThreadTest {
                 new CappuccinoCreator(),
                 new LatteCreator()
         );
+        idCounter = new AtomicInteger(0);
     }
 
     private Customer createCustomer(String id, String name) {
         Customer customer = new Customer(id, name);
         CoffeeShop.getInstance().registerObserver(customer);
         return customer;
+    }
+
+    /** Stub ID generator --- no singleton dependency. */
+    private CustomerThread.OrderIdGenerator stubIdGenerator() {
+        return () -> "TEST-" + idCounter.incrementAndGet();
+    }
+
+    /** Captures orders into a list --- useful for assertions. */
+    private List<Order> captureHandler(CustomerThread.OrderHandler... extra) {
+        return Collections.synchronizedList(new ArrayList<>());
+    }
+
+    /** Builds a CustomerThread with a capturing handler and stub ID generator. */
+    private CustomerThread build(Customer customer,
+                                 List<Order> captured,
+                                 List<CoffeeCreator> creators,
+                                 int count) {
+        return new CustomerThread(
+                customer,
+                captured::add,
+                stubIdGenerator(),
+                creators,
+                count
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -44,45 +74,86 @@ class CustomerThreadTest {
     @Test
     @DisplayName("Constructor rejects null customer")
     void constructorRejectsNullCustomer() {
-        OrderQueue queue = new OrderQueue(5);
-        assertThrows(IllegalArgumentException.class,
-                () -> new CustomerThread(null, queue, menu, 1));
+        assertThrows(IllegalArgumentException.class, () ->
+                new CustomerThread(
+                        null,
+                        order -> {},
+                        stubIdGenerator(),
+                        menu,
+                        1));
     }
 
     @Test
-    @DisplayName("Constructor rejects null queue")
-    void constructorRejectsNullQueue() {
+    @DisplayName("Constructor rejects null OrderHandler")
+    void constructorRejectsNullOrderHandler() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        assertThrows(IllegalArgumentException.class,
-                () -> new CustomerThread(alice, null, menu, 1));
+        assertThrows(IllegalArgumentException.class, () ->
+                new CustomerThread(
+                        alice,
+                        null,
+                        stubIdGenerator(),
+                        menu,
+                        1));
+    }
+
+    @Test
+    @DisplayName("Constructor rejects null OrderIdGenerator")
+    void constructorRejectsNullIdGenerator() {
+        Customer alice = createCustomer("CUST-1", "Alice");
+        assertThrows(IllegalArgumentException.class, () ->
+                new CustomerThread(
+                        alice,
+                        order -> {},
+                        null,
+                        menu,
+                        1));
     }
 
     @Test
     @DisplayName("Constructor rejects null creators list")
     void constructorRejectsNullCreators() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(5);
-        assertThrows(IllegalArgumentException.class,
-                () -> new CustomerThread(alice, queue, null, 1));
+        assertThrows(IllegalArgumentException.class, () ->
+                new CustomerThread(
+                        alice,
+                        order -> {},
+                        stubIdGenerator(),
+                        null,
+                        1));
     }
 
     @Test
-    @DisplayName("Constructor rejects zero or negative order count")
-    void constructorRejectsInvalidOrderCount() {
+    @DisplayName("Constructor rejects zero order count")
+    void constructorRejectsZeroOrderCount() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(5);
-        assertThrows(IllegalArgumentException.class,
-                () -> new CustomerThread(alice, queue, menu, 0));
-        assertThrows(IllegalArgumentException.class,
-                () -> new CustomerThread(alice, queue, menu, -3));
+        assertThrows(IllegalArgumentException.class, () ->
+                new CustomerThread(
+                        alice,
+                        order -> {},
+                        stubIdGenerator(),
+                        menu,
+                        0));
+    }
+
+    @Test
+    @DisplayName("Constructor rejects negative order count")
+    void constructorRejectsNegativeOrderCount() {
+        Customer alice = createCustomer("CUST-1", "Alice");
+        assertThrows(IllegalArgumentException.class, () ->
+                new CustomerThread(
+                        alice,
+                        order -> {},
+                        stubIdGenerator(),
+                        menu,
+                        -3));
     }
 
     @Test
     @DisplayName("getCustomer returns the correct customer")
     void getCustomerReturnsCorrectCustomer() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(5);
-        CustomerThread ct = new CustomerThread(alice, queue, menu, 1);
+        List<Order> captured = new ArrayList<>();
+        CustomerThread ct = build(alice, captured, menu, 1);
         assertSame(alice, ct.getCustomer());
     }
 
@@ -90,8 +161,8 @@ class CustomerThreadTest {
     @DisplayName("getNumberOfOrders returns the configured count")
     void getNumberOfOrdersReturnsConfiguredCount() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(10);
-        CustomerThread ct = new CustomerThread(alice, queue, menu, 5);
+        List<Order> captured = new ArrayList<>();
+        CustomerThread ct = build(alice, captured, menu, 5);
         assertEquals(5, ct.getNumberOfOrders());
     }
 
@@ -103,29 +174,29 @@ class CustomerThreadTest {
     @DisplayName("Places the exact number of configured orders")
     void placesExactNumberOfOrders() throws InterruptedException {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(10);
-        CustomerThread ct = new CustomerThread(alice, queue, menu, 3);
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
+        CustomerThread ct = build(alice, captured, menu, 3);
 
         Thread thread = new Thread(ct, "Customer-Alice");
         thread.start();
         thread.join(10000);
 
-        assertEquals(3, queue.size());
+        assertEquals(3, captured.size());
     }
 
     @Test
     @DisplayName("Places a single order correctly")
     void placesSingleOrder() throws InterruptedException {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(5);
-        CustomerThread ct = new CustomerThread(alice, queue, menu, 1);
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
+        CustomerThread ct = build(alice, captured, menu, 1);
 
         Thread thread = new Thread(ct, "Customer-Alice");
         thread.start();
         thread.join(5000);
 
-        assertEquals(1, queue.size());
-        var order = queue.dequeue();
+        assertEquals(1, captured.size());
+        Order order = captured.get(0);
         assertSame(alice, order.getCustomer());
         assertNotNull(order.getCoffee());
         assertTrue(order.getCoffee().getCost() > 0);
@@ -135,74 +206,171 @@ class CustomerThreadTest {
     @DisplayName("All orders belong to the correct customer")
     void allOrdersBelongToCorrectCustomer() throws InterruptedException {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(10);
-        CustomerThread ct = new CustomerThread(alice, queue, menu, 5);
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
+        CustomerThread ct = build(alice, captured, menu, 5);
 
         Thread thread = new Thread(ct, "Customer-Alice");
         thread.start();
         thread.join(15000);
 
-        assertEquals(5, queue.size());
-        for (int i = 0; i < 5; i++) {
-            assertSame(alice, queue.dequeue().getCustomer());
-        }
+        assertEquals(5, captured.size());
+        captured.forEach(order -> assertSame(alice, order.getCustomer()));
     }
 
     @Test
     @DisplayName("Orders have valid coffee with positive cost")
     void ordersHaveValidCoffee() throws InterruptedException {
         Customer alice = createCustomer("CUST-1", "Alice");
-        OrderQueue queue = new OrderQueue(10);
-        CustomerThread ct = new CustomerThread(alice, queue, menu, 3);
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
+        CustomerThread ct = build(alice, captured, menu, 3);
 
         Thread thread = new Thread(ct, "Customer-Alice");
         thread.start();
         thread.join(10000);
 
-        for (int i = 0; i < 3; i++) {
-            var order = queue.dequeue();
+        captured.forEach(order -> {
             assertNotNull(order.getCoffee().getDescription());
             assertTrue(order.getCoffee().getCost() >= 2.50,
                     "Cost should be at least base espresso price");
             assertNotNull(order.getOrderId());
-        }
+        });
+    }
+
+    @Test
+    @DisplayName("Order IDs are generated by the injected generator")
+    void orderIdsComesFromInjectedGenerator() throws InterruptedException {
+        Customer alice = createCustomer("CUST-1", "Alice");
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
+        CustomerThread ct = build(alice, captured,
+                List.of(new EspressoCreator()), 3);
+
+        Thread thread = new Thread(ct, "Customer-Alice");
+        thread.start();
+        thread.join(10000);
+
+        // All IDs should use the stub generator format
+        captured.forEach(order ->
+                assertTrue(order.getOrderId().startsWith("TEST-"),
+                        "ID should come from stub generator, got: " + order.getOrderId()));
     }
 
     @Test
     @DisplayName("Order price reflects customer loyalty tier")
     void orderPriceReflectsLoyaltyTier() throws InterruptedException {
-        // Bring Alice to Gold tier first
         Customer alice = createCustomer("CUST-1", "Alice");
+        // Bring Alice to Gold tier
         for (int i = 0; i < 11; i++) {
             alice.incrementOrders();
         }
 
-        OrderQueue queue = new OrderQueue(5);
-        // Use only EspressoCreator for predictable pricing
-        CustomerThread ct = new CustomerThread(alice, queue,
-                List.of(new EspressoCreator()), 1);
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
+        CustomerThread ct = new CustomerThread(
+                alice,
+                order -> captured.add(order),
+                stubIdGenerator(),
+                List.of(new EspressoCreator()), // predictable pricing
+                1);
 
         Thread thread = new Thread(ct, "Customer-Alice");
         thread.start();
         thread.join(5000);
 
-        // Gold: 20% off -- espresso base is $2.50 + optional extras
-        var order = queue.dequeue();
-        assertTrue(order.getFinalPrice() <= 2.50,
-                "Gold member should pay at most base espresso price");
+        // Gold: 20% off --- espresso base $2.50, max with all extras = $4.00
+        // 20% off $4.00 = $3.20 max
+        assertEquals(1, captured.size());
+        assertTrue(captured.get(0).getFinalPrice() <= 3.20,
+                "Gold member price should reflect 20% discount");
     }
 
     // -----------------------------------------------------------------------
-    // Blocking behaviour
+    // OrderHandler is called correctly
     // -----------------------------------------------------------------------
 
     @Test
-    @DisplayName("Customer blocks when queue is full and resumes when space opens")
-    void blocksOnFullQueue() throws InterruptedException {
+    @DisplayName("OrderHandler is called exactly once per order")
+    void orderHandlerCalledExactlyOncePerOrder() throws InterruptedException {
+        Customer alice = createCustomer("CUST-1", "Alice");
+        AtomicInteger handlerCallCount = new AtomicInteger(0);
+
+        CustomerThread ct = new CustomerThread(
+                alice,
+                order -> handlerCallCount.incrementAndGet(),
+                stubIdGenerator(),
+                List.of(new EspressoCreator()),
+                4);
+
+        Thread thread = new Thread(ct, "Customer-Alice");
+        thread.start();
+        thread.join(10000);
+
+        assertEquals(4, handlerCallCount.get(),
+                "Handler must be called exactly once per order placed");
+    }
+
+    @Test
+    @DisplayName("OrderHandler receives orders with correct customer reference")
+    void orderHandlerReceivesCorrectCustomer() throws InterruptedException {
+        Customer alice = createCustomer("CUST-1", "Alice");
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
+
+        CustomerThread ct = new CustomerThread(
+                alice,
+                order -> captured.add(order),
+                stubIdGenerator(),
+                List.of(new EspressoCreator()),
+                3);
+
+        Thread thread = new Thread(ct, "Customer-Alice");
+        thread.start();
+        thread.join(10000);
+
+        captured.forEach(order ->
+                assertSame(alice, order.getCustomer(),
+                        "Each order must reference the correct customer"));
+    }
+
+    @Test
+    @DisplayName("OrderHandler interruptedException propagates correctly")
+    void orderHandlerInterruptedExceptionPropagates() throws InterruptedException {
+        Customer alice = createCustomer("CUST-1", "Alice");
+        AtomicInteger handlerCalls = new AtomicInteger(0);
+
+        CustomerThread ct = new CustomerThread(
+                alice,
+                order -> {
+                    handlerCalls.incrementAndGet();
+                    throw new InterruptedException("Simulated interruption");
+                },
+                stubIdGenerator(),
+                List.of(new EspressoCreator()),
+                5);
+
+        Thread thread = new Thread(ct, "Customer-Alice");
+        thread.start();
+        thread.join(5000);
+
+        assertFalse(thread.isAlive());
+        // Only one order handled --- interrupted after first
+        assertEquals(1, handlerCalls.get(),
+                "Thread should stop after handler throws InterruptedException");
+    }
+
+    // -----------------------------------------------------------------------
+    // Blocking behaviour --- with OrderQueue as handler
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Customer blocks when queue handler is full and resumes when space opens")
+    void blocksOnFullQueueHandler() throws InterruptedException {
         OrderQueue smallQueue = new OrderQueue(2);
         Customer alice = createCustomer("CUST-1", "Alice");
-        CustomerThread ct = new CustomerThread(alice, smallQueue,
-                List.of(new EspressoCreator()), 5);
+
+        CustomerThread ct = new CustomerThread(
+                alice,
+                order -> smallQueue.enqueue(order), // queue as handler
+                stubIdGenerator(),
+                List.of(new EspressoCreator()),
+                5);
 
         Thread thread = new Thread(ct, "Customer-Alice");
         thread.start();
@@ -211,7 +379,7 @@ class CustomerThreadTest {
         Thread.sleep(2000);
         assertEquals(2, smallQueue.size(), "Queue should be at capacity");
 
-        // Drain one -- producer should be unblocked and refill
+        // Drain one --- producer should unblock and refill
         smallQueue.dequeue();
         Thread.sleep(2000);
         assertTrue(smallQueue.size() > 0, "Producer should have resumed");
@@ -230,12 +398,17 @@ class CustomerThreadTest {
     // -----------------------------------------------------------------------
 
     @Test
-    @DisplayName("CustomerThread stops gracefully on interruption")
+    @DisplayName("CustomerThread stops gracefully on thread interruption")
     void stopsGracefullyOnInterruption() throws InterruptedException {
         OrderQueue tinyQueue = new OrderQueue(1);
         Customer alice = createCustomer("CUST-1", "Alice");
-        CustomerThread ct = new CustomerThread(alice, tinyQueue,
-                List.of(new EspressoCreator()), 100);
+
+        CustomerThread ct = new CustomerThread(
+                alice,
+                order -> tinyQueue.enqueue(order),
+                stubIdGenerator(),
+                List.of(new EspressoCreator()),
+                100);
 
         Thread thread = new Thread(ct, "Customer-Alice");
         thread.start();
@@ -257,12 +430,18 @@ class CustomerThreadTest {
     void multipleConcurrentCustomers() throws InterruptedException {
         int customerCount = 5;
         int ordersEach = 3;
-        OrderQueue queue = new OrderQueue(50);
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
         CountDownLatch allDone = new CountDownLatch(customerCount);
 
         for (int i = 0; i < customerCount; i++) {
             Customer customer = createCustomer("CUST-" + i, "Customer-" + i);
-            CustomerThread ct = new CustomerThread(customer, queue, menu, ordersEach);
+            CustomerThread ct = new CustomerThread(
+                    customer,
+                    order -> captured.add(order),
+                    stubIdGenerator(),
+                    menu,
+                    ordersEach);
+
             new Thread(() -> {
                 ct.run();
                 allDone.countDown();
@@ -271,8 +450,8 @@ class CustomerThreadTest {
 
         boolean completed = allDone.await(20, TimeUnit.SECONDS);
         assertTrue(completed, "Not all customers finished in time");
-        assertEquals(customerCount * ordersEach, queue.size(),
-                "Total orders in queue should match total placed");
+        assertEquals(customerCount * ordersEach, captured.size(),
+                "Total captured orders should match total placed");
     }
 
     @Test
@@ -280,28 +459,34 @@ class CustomerThreadTest {
     void concurrentCustomersProduceUniqueOrderIds() throws InterruptedException {
         int customerCount = 4;
         int ordersEach = 5;
-        OrderQueue queue = new OrderQueue(100);
+        List<Order> captured = Collections.synchronizedList(new ArrayList<>());
         CountDownLatch allDone = new CountDownLatch(customerCount);
+        AtomicInteger sharedIdCounter = new AtomicInteger(0);
 
         for (int i = 0; i < customerCount; i++) {
             Customer customer = createCustomer("CUST-" + i, "Customer-" + i);
-            CustomerThread ct = new CustomerThread(customer, queue, menu, ordersEach);
+            CustomerThread ct = new CustomerThread(
+                    customer,
+                    order -> captured.add(order),
+                    // Shared atomic counter --- simulates CoffeeShop.nextOrderId()
+                    () -> "ORD-" + sharedIdCounter.incrementAndGet(),
+                    menu,
+                    ordersEach);
+
             new Thread(() -> {
                 ct.run();
                 allDone.countDown();
             }).start();
         }
 
-        allDone.await(20, TimeUnit.SECONDS);
+        boolean completed = allDone.await(20, TimeUnit.SECONDS);
+        assertTrue(completed, "Not all customers finished in time");
 
-        // Collect all order IDs
-        java.util.List<String> ids = new java.util.ArrayList<>();
-        while (!queue.isEmpty()) {
-            ids.add(queue.dequeue().getOrderId());
-        }
-
-        long uniqueCount = ids.stream().distinct().count();
-        assertEquals(ids.size(), uniqueCount,
+        long uniqueCount = captured.stream()
+                .map(Order::getOrderId)
+                .distinct()
+                .count();
+        assertEquals(captured.size(), uniqueCount,
                 "All order IDs must be unique across concurrent customers");
     }
 }

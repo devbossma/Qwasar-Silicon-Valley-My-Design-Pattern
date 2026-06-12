@@ -234,7 +234,7 @@ public class CoffeeShop {
             orders.add(order);
         }
         order.setStatus(OrderStatus.PLACED);
-        orderQueue.enqueue(order);
+        Objects.requireNonNull(orderQueue).enqueue(order);
         System.out.println("[CoffeeShop] Order enqueued: " + order);
     }
 

@@ -16,9 +16,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -140,7 +140,7 @@ class CoffeeShopMultithreadTest {
     class EnqueueOrderTests {
 
         @Test
-        @DisplayName("enqueueOrder() throws when shop is not open")
+        @DisplayName("enqueueOrder() throws IllegalStateException when shop is not open")
         void throwsWhenShopNotOpen() {
             Order order = createOrder("CUST-1", "Alice");
             assertThrows(IllegalStateException.class,
@@ -157,7 +157,7 @@ class CoffeeShopMultithreadTest {
         }
 
         @Test
-        @DisplayName("enqueueOrder() sets status to PLACED")
+        @DisplayName("enqueueOrder() sets order status to PLACED")
         void setsStatusToPlaced() throws InterruptedException {
             shop.open(5, 1);
             Order order = createOrder("CUST-1", "Alice");
@@ -166,12 +166,16 @@ class CoffeeShopMultithreadTest {
         }
 
         @Test
-        @DisplayName("enqueueOrder() adds order to the OrderQueue")
-        void addsToOrderQueue() throws InterruptedException {
-            OrderQueue queue = new OrderQueue(10);
+        @DisplayName("enqueueOrder() adds order to the shop OrderQueue")
+        void addsToShopOrderQueue() throws InterruptedException {
+            shop.open(10, 1);
+
             Order order = createOrder("CUST-1", "Alice");
-            queue.enqueue(order);
-            assertEquals(1, queue.size());
+            shop.enqueueOrder(order);
+
+            // Order was added to permanent list — proves enqueueOrder ran
+            assertEquals(1, shop.getOrderCount());
+            assertEquals(OrderStatus.PLACED, order.getStatus());
         }
 
         @Test
@@ -188,10 +192,9 @@ class CoffeeShopMultithreadTest {
             shop.open(100, 1);
 
             int threadCount = 20;
-            java.util.List<String> ids =
-                    java.util.Collections.synchronizedList(new java.util.ArrayList<>());
-            java.util.concurrent.CountDownLatch latch =
-                    new java.util.concurrent.CountDownLatch(threadCount);
+            List<String> ids = java.util.Collections.synchronizedList(
+                    new ArrayList<>());
+            CountDownLatch latch = new CountDownLatch(threadCount);
 
             for (int i = 0; i < threadCount; i++) {
                 final int idx = i;
@@ -211,7 +214,8 @@ class CoffeeShopMultithreadTest {
                 }).start();
             }
 
-            latch.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            boolean completed = latch.await(10, TimeUnit.SECONDS);
+            assertTrue(completed, "Not all threads finished in time");
 
             long uniqueCount = ids.stream().distinct().count();
             assertEquals(threadCount, uniqueCount,
@@ -276,19 +280,22 @@ class CoffeeShopMultithreadTest {
             }
 
             // Wait for queue to drain
-            while (shop.getOrderQueue() != null
-                    && !shop.getOrderQueue().isEmpty()) {
-                Thread.sleep(500);
+            OrderQueue queue = shop.getOrderQueue();
+            if (queue != null) {
+                while (!queue.isEmpty()) {
+                    Thread.sleep(500);
+                }
             }
-            // Buffer for baristas to finish last order
+            // Buffer for baristas to finish the last dequeued order
             Thread.sleep(4000);
 
             shop.close();
 
-            int fulfilled = (int) shop.getOrders().stream()
+            long fulfilled = shop.getOrders().stream()
                     .filter(o -> o.getStatus() == OrderStatus.FULFILLED)
                     .count();
-            assertEquals(orderCount, fulfilled);
+            assertEquals(orderCount, fulfilled,
+                    "All orders should be FULFILLED after shop closes");
         }
 
         @Test
@@ -309,38 +316,52 @@ class CoffeeShopMultithreadTest {
                 customers.add(c);
             }
 
-            CountDownLatch allDone =
-                    new CountDownLatch(customersCount);
+            CountDownLatch allCustomersDone = new CountDownLatch(customersCount);
+            AtomicInteger idCounter = new AtomicInteger(0);
 
             for (Customer customer : customers) {
+                // Updated constructor — inject OrderHandler and OrderIdGenerator
                 CustomerThread ct = new CustomerThread(
                         customer,
-                        Objects.requireNonNull(shop.getOrderQueue()),
+                        shop::enqueueOrder,          // OrderHandler — registers + enqueues
+                        shop::nextOrderId,           // OrderIdGenerator — thread-safe
                         List.of(new EspressoCreator()),
                         ordersPerCustomer
                 );
-                // Start each customer thread and count down when done
+
                 new Thread(() -> {
                     ct.run();
-                    allDone.countDown();
+                    allCustomersDone.countDown();
                 }, "Customer-" + customer.getName()).start();
             }
 
-            // Wait for all customer threads to finish placing orders
-            allDone.await(20, TimeUnit.SECONDS);
+            // Wait for all customers to finish placing orders
+            boolean customersFinished = allCustomersDone.await(20, TimeUnit.SECONDS);
+            assertTrue(customersFinished, "Not all customers finished placing orders");
 
-            // Wait for baristas to process all orders
-            while (shop.getOrderQueue() != null
-                    && !shop.getOrderQueue().isEmpty()) {
-                Thread.sleep(500);
+            // Wait for queue to drain
+            OrderQueue queue = shop.getOrderQueue();
+            if (queue != null) {
+                int waitMs = 0;
+                while (!queue.isEmpty() && waitMs < 10000) {
+                    Thread.sleep(500);
+                    waitMs += 500;
+                }
             }
 
+            // Buffer for baristas to finish last in-flight order
             Thread.sleep(5000);
 
+            // Verify permanent orders list was populated
+            assertEquals(totalOrders, shop.getOrderCount(),
+                    "All orders should be in the permanent orders list");
+
+            // Verify baristas shared the work and completed everything
             int baristaTotal = shop.getBaristas().stream()
                     .mapToInt(Barista::getOrdersCompleted)
                     .sum();
-            assertEquals(totalOrders, baristaTotal);
+            assertEquals(totalOrders, baristaTotal,
+                    "Barista total should match total orders placed");
             shop.close();
         }
 
@@ -351,8 +372,7 @@ class CoffeeShopMultithreadTest {
             shop.open(100, 1);
 
             int threadCount = 50;
-            java.util.concurrent.CountDownLatch latch =
-                    new java.util.concurrent.CountDownLatch(threadCount);
+            CountDownLatch latch = new CountDownLatch(threadCount);
 
             for (int i = 0; i < threadCount; i++) {
                 final int idx = i;
@@ -371,8 +391,49 @@ class CoffeeShopMultithreadTest {
                 }).start();
             }
 
-            latch.await(10, java.util.concurrent.TimeUnit.SECONDS);
-            assertEquals(threadCount, shop.getOrderCount());
+            boolean completed = latch.await(10, TimeUnit.SECONDS);
+            assertTrue(completed, "Not all threads finished in time");
+            assertEquals(threadCount, shop.getOrderCount(),
+                    "All concurrent orders must be in the orders list");
+        }
+
+        @Test
+        @DisplayName("customer loyalty tier upgrades correctly through concurrent orders")
+        void loyaltyTierUpgradesConcurrently() throws InterruptedException {
+            shop.open(10, 3);
+
+            Customer alice = new Customer(shop.nextCustomerId(), "Alice");
+            shop.registerObserver(alice);
+
+            // Alice places 11 orders — should reach GOLD
+            CustomerThread ct = new CustomerThread(
+                    alice,
+                    shop::enqueueOrder,
+                    shop::nextOrderId,
+                    List.of(new EspressoCreator()),
+                    11
+            );
+
+            Thread thread = new Thread(ct, "Customer-Alice");
+            thread.start();
+            thread.join(20000);
+
+            // Wait for all orders to be fulfilled
+            OrderQueue queue = shop.getOrderQueue();
+            if (queue != null) {
+                while (!queue.isEmpty()) {
+                    Thread.sleep(500);
+                }
+            }
+            Thread.sleep(5000);
+
+            shop.close();
+
+            assertEquals(11, alice.getTotalOrders(),
+                    "Alice should have 11 fulfilled orders");
+            assertEquals(dev.saberlabs.models.LoyaltyTier.GOLD,
+                    alice.getLoyaltyTier(),
+                    "Alice should have reached GOLD tier");
         }
     }
 }

@@ -261,4 +261,27 @@ public class AuthService {
         Objects.requireNonNull(storedHash, "Stored hash cannot be null");
         return hashPassword(plainPassword).equals(storedHash);
     }
+
+    /**
+     * Changes a user's password after verifying their current one.
+     *
+     * @param user            the user changing their password
+     * @param currentPassword their current plain-text password, for verification
+     * @param newPassword     the new plain-text password (will be hashed)
+     * @throws AuthException           if the current password is incorrect
+     * @throws IllegalArgumentException if the new password is too short
+     */
+    public void changePassword(@NotNull User user, @NotNull String currentPassword,
+                               @NotNull String newPassword) {
+        Objects.requireNonNull(user, "User cannot be null");
+        if (!verifyPassword(currentPassword, user.passwordHash())) {
+            throw new AuthException("Current password is incorrect");
+        }
+        if (newPassword.length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters");
+        }
+        User updated = new User(user.id(), user.username(),
+                hashPassword(newPassword), user.role(), user.createdAt());
+        userRepository.updatePassword(updated);
+    }
 }

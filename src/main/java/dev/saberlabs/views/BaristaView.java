@@ -4,28 +4,34 @@ import dev.saberlabs.auth.User;
 import dev.saberlabs.chat.ChatMessage;
 import dev.saberlabs.chat.ChatObserver;
 import dev.saberlabs.chat.ChatService;
+import dev.saberlabs.chat.ChatSession;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Scanner;
 
 /**
- * Console-based chat view for an authenticated BARISTA.
+ * Console view for an authenticated BARISTA — the "waiter" role.
  *
- * Shows incoming order messages as they happen and lets the barista
- * send free-text replies back into the shared chat. The actual coffee
- * preparation still runs on the existing {@link dev.saberlabs.multithread.Barista}
- * threads — this view is the human-facing chat surface only.
+ * Goes READY on entry (joining the matching pool), can see all sessions
+ * and who's responsible for each, can switch between their own multiple
+ * ACTIVE sessions, chat within them, manually send orders to the kitchen,
+ * and end sessions.
  */
 public class BaristaView implements ChatObserver {
 
-    private static final String THIN_SEP = "────────────────────────────────────────────────────────";
+    private static final String THIN_SEP =
+            "────────────────────────────────────────────────────────";
 
     @NotNull private final User user;
     @NotNull private final ChatService chatService;
     @NotNull private final CoffeeShop coffeeShop;
     @NotNull private final Scanner scanner;
+
+    /** Which of this barista's sessions is currently displayed, if any. */
+    private ChatSession activeSession;
 
     public BaristaView(@NotNull User user,
                        @NotNull ChatService chatService,
@@ -41,37 +47,164 @@ public class BaristaView implements ChatObserver {
         chatService.registerObserver(this);
 
         printWelcome();
-        printQueueStatus();
+        var matched = chatService.baristaReady(user);
+        matched.ifPresent(s -> System.out.printf(
+                "  ✓ Immediately matched with a waiting customer (Session #%d)%n", s.id()));
+
+        printDashboard();
         printHelp();
 
         boolean running = true;
         while (running) {
             System.out.print("\n[" + user.username() + "] > ");
             String input = scanner.nextLine().trim();
-
             if (input.isEmpty()) continue;
 
-            String lower = input.toLowerCase();
-            switch (lower) {
+            String[] parts = input.split("\\s+");
+            String command = parts[0].toLowerCase();
+
+            switch (command) {
                 case "quit", "exit" -> running = false;
-                case "status" -> printQueueStatus();
                 case "help" -> printHelp();
-                default -> chatService.sendMessage(user.id(), user.username(), input);
+                case "dashboard", "sessions" -> printDashboard();
+                case "switch" -> handleSwitch(parts);
+                case "send-to-kitchen" -> handleSendToKitchen(parts);
+                case "end" -> handleEndSession();
+                case "back" -> activeSession = null;
+                default -> handleChatOrReply(input);
             }
         }
 
+        chatService.baristaOffline(user);
         chatService.removeObserver(this);
         System.out.println("[" + user.username() + "] Clocking out.\n");
     }
 
+    // ================================================================
+    // ChatObserver
+    // ================================================================
+
     @Override
     public void onMessageReceived(@NotNull ChatMessage message) {
+        if (activeSession == null || message.sessionId() != activeSession.id()) return;
         if (message.senderId() == user.id()) return;
 
         System.out.println();
         System.out.println(message);
         System.out.print("[" + user.username() + "] > ");
     }
+
+    // ================================================================
+    // Commands
+    // ================================================================
+
+    private void handleSwitch(String[] parts) {
+        if (parts.length < 2) {
+            System.out.println("  Usage: switch <session-id>");
+            return;
+        }
+        long sessionId;
+        try {
+            sessionId = Long.parseLong(parts[1]);
+        } catch (NumberFormatException e) {
+            System.out.println("  Invalid session ID.");
+            return;
+        }
+
+        boolean owns = chatService.getActiveSessionsForBarista(user).stream()
+                .anyMatch(s -> s.id() == sessionId);
+        if (!owns) {
+            System.out.println("  You are not assigned to session #" + sessionId);
+            return;
+        }
+
+        activeSession = chatService.getActiveSessionsForBarista(user).stream()
+                .filter(s -> s.id() == sessionId)
+                .findFirst()
+                .orElseThrow();
+
+        System.out.printf("  ✓ Switched to session #%d%n", sessionId);
+        printSessionHistory(sessionId);
+
+        var pending = chatService.getPendingOrdersForSession(activeSession);
+        if (!pending.isEmpty()) {
+            System.out.printf("%n  ⚠ %d order(s) waiting to be sent to the kitchen — " +
+                    "type 'send-to-kitchen' to review.%n", pending.size());
+        }
+    }
+
+    private void handleChatOrReply(@NotNull String input) {
+        if (activeSession == null) {
+            System.out.println("  No active session selected. Use 'switch <id>' first.");
+            return;
+        }
+        chatService.sendMessage(activeSession.id(), user.id(), user.username(), input);
+    }
+
+    private void handleSendToKitchen(String[] parts) {
+        if (activeSession == null) {
+            System.out.println("  No active session selected. Use 'switch <id>' first.");
+            return;
+        }
+
+        var pending = chatService.getPendingOrdersForSession(activeSession);
+        if (pending.isEmpty()) {
+            System.out.println("  No pending orders for this customer.");
+            return;
+        }
+
+        System.out.println();
+        System.out.println("  ── Pending Orders (not yet sent to kitchen) ──");
+        for (int i = 0; i < pending.size(); i++) {
+            var order = pending.get(i);
+            System.out.printf("  %d. %-30s $%-8.2f (%s)%n",
+                    i + 1, order.getCoffee().getDescription(),
+                    order.getFinalPrice(), order.getOrderId());
+        }
+        System.out.print("  Select order to send to kitchen (number, or 0 to cancel): ");
+
+        String choice = scanner.nextLine().trim();
+        int index;
+        try {
+            index = Integer.parseInt(choice);
+        } catch (NumberFormatException e) {
+            System.out.println("  Invalid selection.");
+            return;
+        }
+        if (index == 0) {
+            System.out.println("  Cancelled.");
+            return;
+        }
+        if (index < 1 || index > pending.size()) {
+            System.out.println("  Invalid selection.");
+            return;
+        }
+
+        var selected = pending.get(index - 1);
+        try {
+            chatService.sendOrderToKitchen(activeSession, selected.getOrderId());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("  Interrupted while sending order to kitchen.");
+        }
+    }
+
+    private void handleEndSession() {
+        if (activeSession == null) {
+            System.out.println("  No active session selected. Use 'switch <id>' first.");
+            return;
+        }
+        long endedId = activeSession.id();
+        var rematch = chatService.endSession(endedId);
+        System.out.println("  ✓ Session #" + endedId + " closed.");
+        rematch.ifPresent(s -> System.out.println(
+                "  → You were immediately rematched with Session #" + s.id()));
+        activeSession = null;
+    }
+
+    // ================================================================
+    // Display helpers
+    // ================================================================
 
     private void printWelcome() {
         System.out.println();
@@ -80,24 +213,53 @@ public class BaristaView implements ChatObserver {
         System.out.println(THIN_SEP);
     }
 
-    private void printQueueStatus() {
-        var queue = coffeeShop.getOrderQueue();
-        if (queue == null) {
-            System.out.println("  Shop is not open yet — no queue active.");
+    private void printDashboard() {
+        List<ChatSession> all = chatService.getAllSessions();
+        System.out.println();
+        System.out.println("  ── All Sessions ──");
+        if (all.isEmpty()) {
+            System.out.println("  No sessions yet.");
             return;
         }
-        System.out.printf("  Orders waiting: %d/%d%n", queue.size(), queue.getCapacity());
-        coffeeShop.getBaristas().forEach(b ->
-                System.out.printf("  %-12s completed: %d%n",
-                        b.getName(), b.getOrdersCompleted()));
+        System.out.printf("  %-6s %-12s %-10s %-12s %-10s%n",
+                "ID", "Customer", "Status", "Assigned To", "Pending");
+        System.out.println("  " + THIN_SEP);
+        for (ChatSession s : all) {
+            String assigned = s.baristaId() == null ? "—"
+                    : (s.baristaId() == user.id() ? "You" : "Barista #" + s.baristaId());
+            int pendingCount = chatService.getPendingOrdersForSession(s).size();
+            String pendingLabel = pendingCount == 0 ? "—" : pendingCount + " order(s)";
+            System.out.printf("  %-6d %-12d %-10s %-12s %-10s%n",
+                    s.id(), s.customerId(), s.status(), assigned, pendingLabel);
+        }
+
+        var queue = coffeeShop.getOrderQueue();
+        if (queue != null) {
+            System.out.printf("%n  Kitchen queue: %d/%d orders waiting%n",
+                    queue.size(), queue.getCapacity());
+        }
+    }
+
+    private void printSessionHistory(long sessionId) {
+        List<ChatMessage> history = chatService.loadHistory(sessionId);
+        if (history.isEmpty()) {
+            System.out.println("  No messages yet in this session.");
+            return;
+        }
+        System.out.println("  ── Conversation ──");
+        history.forEach(m -> System.out.println("  " + m));
     }
 
     private void printHelp() {
         System.out.println();
         System.out.println("  Commands:");
-        System.out.println("    status        show queue and barista stats");
-        System.out.println("    help          show this help message");
-        System.out.println("    quit          clock out");
-        System.out.println("  Anything else is sent as a chat message to customers.");
+        System.out.println("    dashboard                  show all sessions and their status");
+        System.out.println("    switch <session-id>        switch to one of YOUR active sessions");
+        System.out.println("    send-to-kitchen <order-id> manually send an order for preparation");
+        System.out.println("    end                        end the current session");
+        System.out.println("    back                       deselect the current session");
+        System.out.println("    help                       show this help message");
+        System.out.println("    quit                       clock out");
+        System.out.println("  Anything else is sent as a chat reply in the current session.");
     }
 }

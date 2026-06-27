@@ -226,4 +226,31 @@ public class UserRepository {
                 LocalDateTime.parse(rs.getString("created_at"))
         );
     }
+
+    /**
+     * Updates only the password hash for an existing user.
+     * Used when a user changes their password — username, role, and
+     * created_at remain unchanged.
+     *
+     * @param user the user with the new password hash already set
+     * @throws RuntimeException if no user with that ID exists, or on DB error
+     */
+    public void updatePassword(@NotNull User user) {
+        Objects.requireNonNull(user, "User cannot be null");
+        String sql = "UPDATE users SET password = ? WHERE id = ?";
+        Connection conn = DatabaseUtil.getConnection();
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, user.passwordHash());
+            stmt.setLong(2, user.id());
+            int rowsAffected = stmt.executeUpdate();
+
+            if (rowsAffected == 0) {
+                throw new RuntimeException("No user found with ID: " + user.id());
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update password for user ID: " + user.id(), e);
+        }
+    }
 }

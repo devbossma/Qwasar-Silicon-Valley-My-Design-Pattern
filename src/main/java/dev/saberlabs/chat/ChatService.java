@@ -11,6 +11,7 @@ import dev.saberlabs.factory.LatteCreator;
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
+import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -174,10 +175,15 @@ public class ChatService {
     }
 
     /**
-     * Ends a session — typically called once an order placed within it
-     * has been FULFILLED. Marks it INACTIVE, persists that, and frees
-     * the assigned barista, who is immediately rematched if anyone is
-     * WAITING.
+     * Ends a session — called explicitly when the customer or barista
+     * decides the conversation is over (e.g. typing "end chat" or
+     * "close session"). Marks it INACTIVE, persists that, and frees
+     * the assigned barista, who is immediately rematched if anyone
+     * is WAITING.
+     * *
+     * Note: this is intentionally NOT triggered automatically by order
+     * fulfillment — a customer may want to keep chatting after their
+     * coffee is ready (additional orders, questions, complaints).
      *
      * @param sessionId the session to end
      * @return the barista's next session if they were rematched, or empty
@@ -467,5 +473,38 @@ public class ChatService {
     private void notifySessionMatched(@NotNull ChatSession session) {
         sendSystemMessage(session.id(),
                 "You are now connected. Barista ID: " + session.baristaId());
+    }
+
+    /**
+     * Returns this customer's orders from the existing CoffeeShop domain,
+     * filtered to just their own. Used by CustomerView's "My Order History".
+     *
+     * @param customer the domain Customer to filter by
+     * @return that customer's orders
+     */
+    public @NotNull List<Order> getCoffeeShopOrdersFor(@NotNull Customer customer) {
+        Objects.requireNonNull(customer, "Customer cannot be null");
+        return coffeeShop.getOrders().stream()
+                .filter(o -> o.getCustomer().equals(customer))
+                .toList();
+    }
+
+    // Add to ChatService
+
+    /**
+     * Returns the customer's orders that are still PLACED — i.e. created
+     * via chat but not yet sent to the kitchen by a barista. Used by
+     * BaristaView to show a reviewable menu instead of requiring the
+     * barista to recall or copy-paste an exact order ID from the transcript.
+     *
+     * @param session the session whose customer's orders should be checked
+     * @return that customer's PLACED orders, oldest first
+     */
+    public @NotNull List<Order> getPendingOrdersForSession(@NotNull ChatSession session) {
+        Objects.requireNonNull(session, "Session cannot be null");
+        return coffeeShop.getOrders().stream()
+                .filter(o -> o.getCustomer().getId().equals("CUST-" + session.customerId()))
+                .filter(o -> o.getStatus() == OrderStatus.PLACED)
+                .toList();
     }
 }

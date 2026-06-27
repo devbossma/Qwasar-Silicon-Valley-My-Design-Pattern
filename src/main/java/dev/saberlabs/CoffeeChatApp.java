@@ -6,7 +6,6 @@ import dev.saberlabs.auth.UserRepository;
 import dev.saberlabs.chat.BaristaQueue;
 import dev.saberlabs.chat.ChatRepository;
 import dev.saberlabs.chat.ChatService;
-import dev.saberlabs.chat.ChatSessionCloser;
 import dev.saberlabs.chat.ChatSessionRepository;
 import dev.saberlabs.db.DatabaseUtil;
 import dev.saberlabs.singleton.CoffeeShop;
@@ -19,7 +18,7 @@ import java.util.Scanner;
 
 /**
  * Entry point for Part 01 — Coffee Chat (console version).
- *
+ * *
  * Startup sequence:
  * 1. Initialize the SQLite database from schema.sql (create tables if absent).
  * 2. Seed a default MANAGER account if no users exist yet.
@@ -55,9 +54,6 @@ public class CoffeeChatApp {
         // 4 — Recover live queue state from persisted sessions
         chatService.recoverSessionsOnStartup();
 
-        // 5 — Auto-close chat sessions when their order is fulfilled
-        shop.registerObserver(new ChatSessionCloser(chatService, chatRepository));
-
         try (Scanner scanner = new Scanner(System.in)) {
             boolean keepRunning = true;
             while (keepRunning) {
@@ -66,10 +62,9 @@ public class CoffeeChatApp {
                 User user = loginView.run();
 
                 switch (user.role()) {
-                    case CUSTOMER -> new CustomerView(user, chatService, scanner).run();
+                    case CUSTOMER -> new CustomerView(user, chatService, authService, scanner).run();
                     case BARISTA -> new BaristaView(user, chatService, shop, scanner).run();
-                    case MANAGER -> new ManagerView(
-                            user, authService, userRepository, chatService, scanner).run();
+                    case MANAGER -> new ManagerView(user, authService, userRepository, chatService, chatRepository, scanner).run();
                 }
 
                 System.out.print("\nReturn to login screen? (y/n): ");

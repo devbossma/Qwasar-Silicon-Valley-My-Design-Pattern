@@ -73,9 +73,6 @@ public class Barista implements Runnable {
                 // OBSERVER -- setStatus triggers notifyObservers via CoffeeShop
                 order.setStatus(OrderStatus.READY);
 
-                // STRATEGY + OBSERVER -- FULFILLED increments loyalty tier
-                order.setStatus(OrderStatus.FULFILLED);
-
                 ordersCompleted++;
                 System.out.printf("[%s] ✓ Completed order for %s (%d total)%n",
                         name,

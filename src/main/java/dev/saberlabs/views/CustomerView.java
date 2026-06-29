@@ -147,7 +147,7 @@ public class CustomerView implements ChatObserver {
 
     private void printOrderHistory() {
         var customer = chatService.resolveCustomer(user);
-        var orders = chatService.getCoffeeShopOrdersFor(customer);
+        var orders = chatService.getOrderHistory(user);
 
         System.out.println();
         if (orders.isEmpty()) {
@@ -161,9 +161,12 @@ public class CustomerView implements ChatObserver {
         System.out.printf("  %-10s %-30s %-10s %-10s%n",
                 "Order #", "Coffee", "Price", "Status");
         System.out.println("  " + THIN_SEP);
-        orders.forEach(o -> System.out.printf("  %-10s %-30s $%-9.2f %-10s%n",
-                o.getOrderId(), o.getCoffee().getDescription(),
-                o.getFinalPrice(), o.getStatus()));
+        orders.forEach(o -> {
+            String description = o.baseCoffee()
+                    + (o.extras().isEmpty() ? "" : " + " + String.join(" + ", o.extras()));
+            System.out.printf("  %-10s %-30s $%-9.2f %-10s%n",
+                    o.id(), description, o.total(), o.status());
+        });
         System.out.println();
     }
 

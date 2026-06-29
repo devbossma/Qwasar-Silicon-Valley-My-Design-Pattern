@@ -19,5 +19,4 @@ public record  StoredOrder(
         @NotNull StoredCoffee coffee,
         double finalPrice,
         @Nullable OrderStatus status
-) {
-}
+) { }

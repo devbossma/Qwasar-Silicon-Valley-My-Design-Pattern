@@ -1,8 +1,7 @@
 package dev.saberlabs.auth;
 
-import dev.saberlabs.db.DatabaseUtil;
+
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -10,7 +9,8 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Objects;
-import java.util.Optional;
+import dev.saberlabs.auth.repositories.UserRepository;
+import dev.saberlabs.auth.repositories.implementations.sqlite.SqliteUserRepository;
 
 /**
  * Handles user authentication and registration for the coffee shop chat application.

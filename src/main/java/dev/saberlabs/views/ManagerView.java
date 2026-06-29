@@ -2,11 +2,11 @@ package dev.saberlabs.views;
 
 import dev.saberlabs.auth.AuthService;
 import dev.saberlabs.auth.User;
-import dev.saberlabs.auth.UserRepository;
-import dev.saberlabs.chat.ChatRepository;
+import dev.saberlabs.auth.repositories.UserRepository;
 import dev.saberlabs.chat.ChatMessage;
 import dev.saberlabs.chat.ChatService;
 import dev.saberlabs.chat.ChatSession;
+import dev.saberlabs.chat.repositories.ChatRepository;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;

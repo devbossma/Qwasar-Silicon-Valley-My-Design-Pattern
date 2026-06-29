@@ -2,11 +2,16 @@ package dev.saberlabs;
 
 import dev.saberlabs.auth.AuthService;
 import dev.saberlabs.auth.User;
-import dev.saberlabs.auth.UserRepository;
+import dev.saberlabs.auth.repositories.UserRepository;
+import dev.saberlabs.auth.repositories.implementations.sqlite.SqliteUserRepository;
 import dev.saberlabs.chat.BaristaQueue;
-import dev.saberlabs.chat.ChatRepository;
 import dev.saberlabs.chat.ChatService;
-import dev.saberlabs.chat.ChatSessionRepository;
+import dev.saberlabs.chat.repositories.ChatOrderRepository;
+import dev.saberlabs.chat.repositories.ChatRepository;
+import dev.saberlabs.chat.repositories.ChatSessionRepository;
+import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatOrderRepository;
+import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatRepository;
+import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatSessionRepository;
 import dev.saberlabs.db.DatabaseUtil;
 import dev.saberlabs.singleton.CoffeeShop;
 import dev.saberlabs.views.BaristaView;
@@ -34,19 +39,20 @@ public class CoffeeChatApp {
     private static final int NUMBER_OF_BARISTAS = 2;
 
     public static void main(String[] args) {
-        // 1 & 2 — Database + seed manager
-        DatabaseUtil.initialize();
-
-        UserRepository userRepository = new UserRepository();
+        UserRepository userRepository = new SqliteUserRepository();
         AuthService authService = new AuthService(userRepository);
         authService.seedManagerIfAbsent();
 
-        ChatRepository chatRepository = new ChatRepository();
-        ChatSessionRepository sessionRepository = new ChatSessionRepository();
+        ChatRepository chatRepository = new SqliteChatRepository();
+        ChatSessionRepository sessionRepository = new SqliteChatSessionRepository();
+        ChatOrderRepository orderRepository = new SqliteChatOrderRepository();
         BaristaQueue baristaQueue = new BaristaQueue();
         CoffeeShop shop = CoffeeShop.getInstance();
+
         ChatService chatService = new ChatService(
-                chatRepository, sessionRepository, baristaQueue, shop);
+                chatRepository, sessionRepository, orderRepository, baristaQueue, shop);
+        // 1 & 2 — Database + seed manager
+        DatabaseUtil.initialize();
 
         // 3 — Open the shop (worker Barista threads start consuming the OrderQueue)
         shop.open(QUEUE_CAPACITY, NUMBER_OF_BARISTAS);
@@ -64,7 +70,8 @@ public class CoffeeChatApp {
                 switch (user.role()) {
                     case CUSTOMER -> new CustomerView(user, chatService, authService, scanner).run();
                     case BARISTA -> new BaristaView(user, chatService, shop, scanner).run();
-                    case MANAGER -> new ManagerView(user, authService, userRepository, chatService, chatRepository, scanner).run();
+                    case MANAGER -> // ManagerView constructor call site — chatRepository param now typed as the interface
+                            new ManagerView(user, authService, userRepository, chatService, chatRepository, scanner).run();
                 }
 
                 System.out.print("\nReturn to login screen? (y/n): ");

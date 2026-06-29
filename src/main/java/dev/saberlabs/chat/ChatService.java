@@ -1,6 +1,10 @@
 package dev.saberlabs.chat;
 
+import dev.saberlabs.adapter.PaymentGateway;
 import dev.saberlabs.auth.User;
+import dev.saberlabs.chat.repositories.ChatOrderRepository;
+import dev.saberlabs.chat.repositories.ChatRepository;
+import dev.saberlabs.chat.repositories.ChatSessionRepository;
 import dev.saberlabs.decorator.MilkDecorator;
 import dev.saberlabs.decorator.SugarDecorator;
 import dev.saberlabs.decorator.WhippedCreamDecorator;
@@ -12,17 +16,13 @@ import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.order.StoredOrder;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
@@ -30,22 +30,9 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * message persistence, order placement via chat commands, and Observer
  * notifications to console/UI listeners.
  *
- * <h3>How the three subsystems fit together</h3>
- * <pre>
- *   BaristaQueue          — live, in-memory FIFO matching (who's free now)
- *   ChatSessionRepository — durable record of sessions (survives restart)
- *   ChatRepository         — durable record of messages, scoped by session
- * </pre>
- * Every time {@link BaristaQueue} changes live state (a match happens, a
- * session ends), ChatService immediately persists that change via the
- * repositories — so the database is always a faithful snapshot of the
- * live queue, not just a log of messages.
- *
- * <h3>Thread safety</h3>
- * Observers use {@link CopyOnWriteArraySet} (same approach as
- * {@link dev.saberlabs.observer.OrderNotificationService}). The customer
- * cache is synchronized since multiple sessions could resolve concurrently.
- * {@link BaristaQueue} itself is internally lock-protected.
+ * Order ID continuity is owned by {@link ChatOrderRepository#nextOrderId()},
+ * which queries the actual orders table rather than trusting an in-memory
+ * counter — this is what survives application restarts without ID collisions.
  */
 public class ChatService {
 
@@ -53,13 +40,13 @@ public class ChatService {
 
     @NotNull private final ChatRepository chatRepository;
     @NotNull private final ChatSessionRepository sessionRepository;
+    @NotNull private final ChatOrderRepository orderRepository;
     @NotNull private final BaristaQueue baristaQueue;
     @NotNull private final CoffeeShop coffeeShop;
 
     @NotNull private final CopyOnWriteArraySet<ChatObserver> observers =
             new CopyOnWriteArraySet<>();
 
-    /** Maps a User's database ID to their domain Customer object. */
     @NotNull private final Map<Long, Customer> customerCache = new HashMap<>();
 
     @NotNull private final Map<String, CoffeeCreator> menu = Map.of(
@@ -70,10 +57,12 @@ public class ChatService {
 
     public ChatService(@NotNull ChatRepository chatRepository,
                        @NotNull ChatSessionRepository sessionRepository,
+                       @NotNull ChatOrderRepository orderRepository,
                        @NotNull BaristaQueue baristaQueue,
                        @NotNull CoffeeShop coffeeShop) {
         this.chatRepository = Objects.requireNonNull(chatRepository, "ChatRepository cannot be null");
         this.sessionRepository = Objects.requireNonNull(sessionRepository, "ChatSessionRepository cannot be null");
+        this.orderRepository = Objects.requireNonNull(orderRepository, "ChatOrderRepository cannot be null");
         this.baristaQueue = Objects.requireNonNull(baristaQueue, "BaristaQueue cannot be null");
         this.coffeeShop = Objects.requireNonNull(coffeeShop, "CoffeeShop cannot be null");
     }
@@ -82,14 +71,6 @@ public class ChatService {
     // Customer <-> User linking
     // ================================================================
 
-    /**
-     * Resolves the domain {@link Customer} for an authenticated CUSTOMER user.
-     * Creates one on first call, reuses the cached instance afterward,
-     * and registers it as an Observer with the CoffeeShop singleton.
-     *
-     * @param user the authenticated user, must have role CUSTOMER
-     * @return the linked Customer domain object
-     */
     public synchronized @NotNull Customer resolveCustomer(@NotNull User user) {
         Objects.requireNonNull(user, "User cannot be null");
         if (!user.isCustomer()) {
@@ -104,21 +85,9 @@ public class ChatService {
     }
 
     // ================================================================
-    // Session lifecycle — "Start Chat" entry point for customers
+    // Session lifecycle
     // ================================================================
 
-    /**
-     * Starts or resumes a chat session for a customer.
-     * *
-     * If the customer has an existing non-INACTIVE session, it is resumed
-     * as-is (its current WAITING or ACTIVE status and barista assignment
-     * are preserved — this does NOT re-run matching). Otherwise, a new
-     * session is created and immediately offered to the BaristaQueue,
-     * which may match it to a READY barista right away.
-     *
-     * @param customerUser the customer starting the chat
-     * @return the session the customer is now in (WAITING or ACTIVE)
-     */
     public @NotNull ChatSession startChat(@NotNull User customerUser) {
         Objects.requireNonNull(customerUser, "Customer user cannot be null");
         if (!customerUser.isCustomer()) {
@@ -142,13 +111,6 @@ public class ChatService {
         return afterMatching;
     }
 
-    /**
-     * Marks a barista as READY to take the next available session.
-     * If a customer is already WAITING, the barista is matched immediately.
-     *
-     * @param baristaUser the barista becoming available
-     * @return the session the barista was matched with, if any
-     */
     public @NotNull Optional<ChatSession> baristaReady(@NotNull User baristaUser) {
         Objects.requireNonNull(baristaUser, "Barista user cannot be null");
         if (!baristaUser.isBarista()) {
@@ -163,31 +125,11 @@ public class ChatService {
         return matched;
     }
 
-    /**
-     * Removes a barista from the READY pool (e.g. logging out).
-     * Does not affect sessions they are already ACTIVE on.
-     *
-     * @param baristaUser the barista going OFFLINE
-     */
     public void baristaOffline(@NotNull User baristaUser) {
         Objects.requireNonNull(baristaUser, "Barista user cannot be null");
         baristaQueue.baristaOffline(baristaUser.id());
     }
 
-    /**
-     * Ends a session — called explicitly when the customer or barista
-     * decides the conversation is over (e.g. typing "end chat" or
-     * "close session"). Marks it INACTIVE, persists that, and frees
-     * the assigned barista, who is immediately rematched if anyone
-     * is WAITING.
-     * *
-     * Note: this is intentionally NOT triggered automatically by order
-     * fulfillment — a customer may want to keep chatting after their
-     * coffee is ready (additional orders, questions, complaints).
-     *
-     * @param sessionId the session to end
-     * @return the barista's next session if they were rematched, or empty
-     */
     public @NotNull Optional<ChatSession> endSession(long sessionId) {
         sessionRepository.findById(sessionId).ifPresent(session ->
                 sessionRepository.save(session.deactivate()));
@@ -200,49 +142,19 @@ public class ChatService {
         return rematch;
     }
 
-    /**
-     * Returns every session in the system — used by the barista dashboard
-     * to show all sessions, their status, and who is responsible for each.
-     *
-     * @return unmodifiable list of all sessions, newest first
-     */
     public @NotNull List<ChatSession> getAllSessions() {
         return sessionRepository.findAll();
     }
 
-    /**
-     * Returns a barista's currently ACTIVE sessions — used when a barista
-     * logs back in and needs to resume conversations they were handling.
-     *
-     * @param baristaUser the barista
-     * @return unmodifiable list of that barista's active sessions
-     */
     public @NotNull List<ChatSession> getActiveSessionsForBarista(@NotNull User baristaUser) {
         Objects.requireNonNull(baristaUser, "Barista user cannot be null");
         return sessionRepository.findActiveSessionsByBarista(baristaUser.id());
     }
 
-
     /**
-     * Re-synchronizes the in-memory {@link BaristaQueue} with whatever
-     * sessions were left in the database from a previous run.
-     * *
-     * Must be called once at application startup, before any barista calls
-     * {@link #baristaReady(User)} and before any customer calls
-     * {@link #startChat(User)} — otherwise, an ACTIVE session from a prior
-     * run would be invisible to the queue, and a barista who was mid-conversation
-     * before a restart could be handed a second customer on top of the one
-     * they're still actually talking to
-     *
-     * <h3>What this does</h3>
-     * <ul>
-     *   <li>ACTIVE sessions — the assigned barista is marked busy by simply
-     *       NOT adding them to the ready pool. No queue action needed; the
-     *       absence from the ready pool IS the "busy" state.</li>
-     *   <li>WAITING sessions — re-enqueued via {@link BaristaQueue#customerWaiting}
-     *       so they're immediately matchable once a barista goes READY.</li>
-     *   <li>INACTIVE sessions — ignored, already historical.</li>
-     * </ul>
+     * Re-synchronizes the in-memory {@link BaristaQueue} with sessions
+     * left in the database from a previous run. Must be called once at
+     * startup, before any baristaReady()/startChat() calls.
      */
     public void recoverSessionsOnStartup() {
         List<ChatSession> all = sessionRepository.findAll();
@@ -267,24 +179,12 @@ public class ChatService {
     // Sending and processing messages
     // ================================================================
 
-    /**
-     * Sends a plain chat message within a session — saves it and notifies observers.
-     *
-     * @param sessionId  the session this message belongs to
-     * @param senderId   the sender's user ID
-     * @param senderName the sender's display name
-     * @param content    the message text
-     * @return the persisted message
-     */
     public @NotNull ChatMessage sendMessage(long sessionId, long senderId,
                                             @NotNull String senderName,
                                             @NotNull String content) {
         return sendMessage(sessionId, senderId, senderName, content, null);
     }
 
-    /**
-     * Sends a chat message associated with an order — saves it and notifies observers.
-     */
     public @NotNull ChatMessage sendMessage(long sessionId, long senderId,
                                             @NotNull String senderName,
                                             @NotNull String content,
@@ -298,17 +198,6 @@ public class ChatService {
         return saved;
     }
 
-
-
-    /**
-     * Processes raw input from a customer inside an active session — either
-     * a plain chat message or an "order &lt;coffee&gt; [extras]" command.
-     *
-     * @param user    the customer sending the input
-     * @param session the session this input belongs to
-     * @param input   the raw text typed by the customer
-     * @return the resulting chat message
-     */
     public @NotNull ChatMessage processCustomerInput(@NotNull User user,
                                                      @NotNull ChatSession session,
                                                      @NotNull String input) {
@@ -324,7 +213,7 @@ public class ChatService {
     }
 
     // ================================================================
-    // Order command parsing
+    // Order command parsing — now persists a StoredOrder row
     // ================================================================
 
     private @NotNull ChatMessage handleOrderCommand(@NotNull User user,
@@ -348,6 +237,7 @@ public class ChatService {
 
         Coffee coffee = creator.createCoffee();
 
+        List<String> appliedExtras = new ArrayList<>();
         List<String> unknownExtras = new ArrayList<>();
         for (int i = 2; i < parts.length; i++) {
             String extra = parts[i].toLowerCase(Locale.ROOT);
@@ -356,6 +246,7 @@ public class ChatService {
                 unknownExtras.add(extra);
             } else {
                 coffee = decorated;
+                appliedExtras.add(extra);
             }
         }
 
@@ -365,9 +256,25 @@ public class ChatService {
                             + ". Available: milk, sugar, whipped");
         }
 
+        // Domain order — Strategy auto-prices from loyalty tier
         Customer customer = resolveCustomer(user);
-        Order order = new Order(customer, coffee, coffeeShop.nextOrderId());
+        String orderId = orderRepository.nextOrderId(); // DB-backed, no collision across restarts
+        Order order = new Order(customer, coffee, orderId);
         coffeeShop.placeOrder(order);
+
+        // Persisted tracking row — links the order to this user/session
+        StoredOrder stored = new StoredOrder(
+                orderId,
+                user.id(),
+                null,            // no barista assigned yet
+                session.id(),
+                coffeeType,
+                appliedExtras,
+                order.getFinalPrice(),
+                OrderStatus.PLACED.name(),
+                LocalDateTime.now()
+        );
+        orderRepository.save(stored);
 
         String confirmation = String.format(
                 "Order placed! %s — $%.2f (Order #%s). Waiting for the barista to send it to the kitchen.",
@@ -377,20 +284,32 @@ public class ChatService {
     }
 
     /**
+     * Returns the customer's orders still PLACED — created via chat but
+     * not yet sent to the kitchen. Used by BaristaView to show a
+     * reviewable numbered menu instead of requiring an exact ID.
+     *
+     * @param session the session whose customer's orders should be checked
+     * @return that customer's PLACED orders, oldest first
+     */
+    public @NotNull List<StoredOrder> getPendingOrdersForSession(@NotNull ChatSession session) {
+        Objects.requireNonNull(session, "Session cannot be null");
+        return orderRepository.findByCustomerAndStatus(
+                session.customerId(), OrderStatus.PLACED.name());
+    }
+
+    /**
      * Called by a human barista to manually push an order from a chat
-     * session into the existing automated pipeline — Factory/Decorator
-     * already happened when the order was created; this step enqueues
-     * it for the worker Barista threads to actually prepare.
+     * session into the existing automated pipeline. Updates the
+     * persisted order row with the barista's ID and enqueues the
+     * live Order domain object for the worker Barista threads.
      *
-     * The barista is the "waiter" — they decide when to send it to the
-     * kitchen. The worker threads (Template Method) are unaffected and
-     * remain fully automated, exactly as in the multithreading project.
-     *
-     * @param session the session containing the order
-     * @param orderId the order to send to the kitchen
+     * @param session   the session containing the order
+     * @param baristaId the barista sending the order
+     * @param orderId   the order to send to the kitchen
      * @throws InterruptedException if the worker queue is full and blocks
      */
     public void sendOrderToKitchen(@NotNull ChatSession session,
+                                   long baristaId,
                                    @NotNull String orderId) throws InterruptedException {
         Objects.requireNonNull(session, "Session cannot be null");
         Objects.requireNonNull(orderId, "Order ID cannot be null");
@@ -407,6 +326,8 @@ public class ChatService {
                 .ifPresentOrElse(
                         order -> {
                             try {
+                                orderRepository.updateAssignmentAndStatus(
+                                        orderId, baristaId, session.id(), OrderStatus.PREPARING.name());
                                 queue.enqueue(order);
                                 sendSystemMessage(session.id(),
                                         "Order #" + orderId + " sent to the kitchen!");
@@ -417,6 +338,58 @@ public class ChatService {
                         () -> sendSystemMessage(session.id(),
                                 "Order #" + orderId + " not found.")
                 );
+    }
+
+    /**
+     * Collects payment for a READY order and marks it FULFILLED.
+     * This is the explicit human action that completes an order — the
+     * worker Barista threads only ever bring an order to READY (physically
+     * prepared); a chat barista must confirm payment before it's FULFILLED.
+     *
+     * @param session         the session containing the order
+     * @param orderId         the order to collect payment for
+     * @param paymentGateway  the adapter to process payment through
+     *                        (PayPalAdapter, StripeAdapter, CashPaymentAdapter)
+     * @return true if payment succeeded and the order is now FULFILLED
+     */
+    public boolean collectPaymentAndFulfill(@NotNull ChatSession session,
+                                            @NotNull String orderId,
+                                            @NotNull PaymentGateway paymentGateway) {
+        Objects.requireNonNull(session, "Session cannot be null");
+        Objects.requireNonNull(orderId, "Order ID cannot be null");
+        Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
+
+        var orderOpt = coffeeShop.getOrders().stream()
+                .filter(o -> o.getOrderId().equals(orderId))
+                .findFirst();
+
+        if (orderOpt.isEmpty()) {
+            sendSystemMessage(session.id(), "Order #" + orderId + " not found.");
+            return false;
+        }
+
+        Order order = orderOpt.get();
+        if (order.getStatus() != OrderStatus.READY) {
+            sendSystemMessage(session.id(),
+                    "Order #" + orderId + " is not ready for payment yet (status: "
+                            + order.getStatus() + ").");
+            return false;
+        }
+
+        boolean paid = paymentGateway.processPayment(orderId, order.getFinalPrice());
+        if (!paid) {
+            sendSystemMessage(session.id(),
+                    "Payment failed for order #" + orderId + ". Please try again.");
+            return false;
+        }
+
+        order.setStatus(OrderStatus.FULFILLED);
+        orderRepository.updateStatus(orderId, OrderStatus.FULFILLED.name());
+
+        sendSystemMessage(session.id(),
+                String.format("Payment of $%.2f received for order #%s. Enjoy your coffee!",
+                        order.getFinalPrice(), orderId));
+        return true;
     }
 
     private @NotNull Coffee applyExtra(@NotNull Coffee coffee, @NotNull String extra) {
@@ -433,15 +406,26 @@ public class ChatService {
     }
 
     // ================================================================
-    // History
+    // Order history
     // ================================================================
 
     /**
-     * Loads the conversation history for a single session, oldest first.
+     * Returns the customer's full order history from the persisted
+     * orders table (not the in-memory CoffeeShop list, which resets
+     * on restart). Used by CustomerView's "My Order History".
      *
-     * @param sessionId the session to load
-     * @return that session's full message history
+     * @param user the customer
+     * @return that customer's orders, newest first
      */
+    public @NotNull List<StoredOrder> getOrderHistory(@NotNull User user) {
+        Objects.requireNonNull(user, "User cannot be null");
+        return orderRepository.findByCustomer(user.id());
+    }
+
+    // ================================================================
+    // Chat history
+    // ================================================================
+
     public @NotNull List<ChatMessage> loadHistory(long sessionId) {
         return chatRepository.findBySessionId(sessionId);
     }
@@ -466,45 +450,24 @@ public class ChatService {
         }
     }
 
-    /**
-     * Sends a system notification into a newly matched session so both
-     * parties see confirmation immediately, before any human types anything.
-     */
     private void notifySessionMatched(@NotNull ChatSession session) {
         sendSystemMessage(session.id(),
                 "You are now connected. Barista ID: " + session.baristaId());
     }
 
     /**
-     * Returns this customer's orders from the existing CoffeeShop domain,
-     * filtered to just their own. Used by CustomerView's "My Order History".
+     * Returns the live Order domain objects for a customer ID, from the
+     * in-memory CoffeeShop list. Used during an active session to check
+     * READY status before collecting payment — only valid while the
+     * order is still in memory (same JVM run it was created in).
      *
-     * @param customer the domain Customer to filter by
-     * @return that customer's orders
+     * @param customerUserId the customer's User ID
+     * @return that customer's live orders this session
      */
-    public @NotNull List<Order> getCoffeeShopOrdersFor(@NotNull Customer customer) {
-        Objects.requireNonNull(customer, "Customer cannot be null");
+    public @NotNull List<Order> getCoffeeShopOrdersForCustomer(long customerUserId) {
+        String customerId = "CUST-" + customerUserId;
         return coffeeShop.getOrders().stream()
-                .filter(o -> o.getCustomer().equals(customer))
-                .toList();
-    }
-
-    // Add to ChatService
-
-    /**
-     * Returns the customer's orders that are still PLACED — i.e. created
-     * via chat but not yet sent to the kitchen by a barista. Used by
-     * BaristaView to show a reviewable menu instead of requiring the
-     * barista to recall or copy-paste an exact order ID from the transcript.
-     *
-     * @param session the session whose customer's orders should be checked
-     * @return that customer's PLACED orders, oldest first
-     */
-    public @NotNull List<Order> getPendingOrdersForSession(@NotNull ChatSession session) {
-        Objects.requireNonNull(session, "Session cannot be null");
-        return coffeeShop.getOrders().stream()
-                .filter(o -> o.getCustomer().getId().equals("CUST-" + session.customerId()))
-                .filter(o -> o.getStatus() == OrderStatus.PLACED)
+                .filter(o -> o.getCustomer().getId().equals(customerId))
                 .toList();
     }
 }

@@ -13,6 +13,7 @@ import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatOrderRep
 import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatRepository;
 import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatSessionRepository;
 import dev.saberlabs.db.DatabaseUtil;
+import dev.saberlabs.order.PersistingOrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
 import dev.saberlabs.views.BaristaView;
 import dev.saberlabs.views.CustomerView;
@@ -41,7 +42,7 @@ public class CoffeeChatApp {
     public static void main(String[] args) {
         UserRepository userRepository = new SqliteUserRepository();
         AuthService authService = new AuthService(userRepository);
-        authService.seedManagerIfAbsent();
+
 
         ChatRepository chatRepository = new SqliteChatRepository();
         ChatSessionRepository sessionRepository = new SqliteChatSessionRepository();
@@ -53,12 +54,16 @@ public class CoffeeChatApp {
                 chatRepository, sessionRepository, orderRepository, baristaQueue, shop);
         // 1 & 2 — Database + seed manager
         DatabaseUtil.initialize();
+        authService.seedManagerIfAbsent();
 
         // 3 — Open the shop (worker Barista threads start consuming the OrderQueue)
         shop.open(QUEUE_CAPACITY, NUMBER_OF_BARISTAS);
 
         // 4 — Recover live queue state from persisted sessions
         chatService.recoverSessionsOnStartup();
+
+        // 5 — Register the PersistingOrderObserver so that order status changes are mirrored to the database
+        shop.registerObserver(new PersistingOrderObserver(orderRepository));
 
         try (Scanner scanner = new Scanner(System.in)) {
             boolean keepRunning = true;

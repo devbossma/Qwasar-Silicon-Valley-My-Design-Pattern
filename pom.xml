@@ -9,8 +9,8 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>Coffee Shop Design Patterns</name>
-    <description>A coffee shop simulation demonstrating 10 design patterns</description>
+    <name>Coffee Shop</name>
+    <description>A coffee shop simulation demonstrating 10 design patterns + multithreading + chat ui interface</description>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>

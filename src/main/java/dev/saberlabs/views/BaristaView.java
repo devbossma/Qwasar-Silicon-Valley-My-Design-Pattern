@@ -1,13 +1,10 @@
 package dev.saberlabs.views;
 
-import dev.saberlabs.adapter.PaymentGateway;
 import dev.saberlabs.auth.User;
 import dev.saberlabs.chat.ChatMessage;
 import dev.saberlabs.chat.ChatObserver;
 import dev.saberlabs.chat.ChatService;
 import dev.saberlabs.chat.ChatSession;
-import dev.saberlabs.models.OrderStatus;
-import dev.saberlabs.payment.PaymentSetup;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 
@@ -72,7 +69,6 @@ public class BaristaView implements ChatObserver {
                 case "dashboard", "sessions" -> printDashboard();
                 case "switch" -> handleSwitch(parts);
                 case "send-to-kitchen" -> handleSendToKitchen(parts);
-                case "collect-payment" -> handleCollectPayment();
                 case "end" -> handleEndSession();
                 case "back" -> activeSession = null;
                 default -> handleChatOrReply(input);
@@ -193,68 +189,6 @@ public class BaristaView implements ChatObserver {
         }
     }
 
-    private void handleCollectPayment() {
-        if (activeSession == null) {
-            System.out.println("  No active session selected. Use 'switch <id>' first.");
-            return;
-        }
-
-        var readyOrders = chatService.getCoffeeShopOrdersForCustomer(activeSession.customerId())
-                .stream()
-                .filter(o -> o.getStatus() == OrderStatus.READY)
-                .toList();
-
-        if (readyOrders.isEmpty()) {
-            System.out.println("  No orders are READY for payment right now.");
-            return;
-        }
-
-        System.out.println();
-        System.out.println("  ── Orders Ready for Payment ──");
-        for (int i = 0; i < readyOrders.size(); i++) {
-            var order = readyOrders.get(i);
-            System.out.printf("  %d. %-30s $%-8.2f (%s)%n",
-                    i + 1, order.getCoffee().getDescription(),
-                    order.getFinalPrice(), order.getOrderId());
-        }
-        System.out.print("  Select order (number, or 0 to cancel): ");
-
-        int index;
-        try {
-            index = Integer.parseInt(scanner.nextLine().trim());
-        } catch (NumberFormatException e) {
-            System.out.println("  Invalid selection.");
-            return;
-        }
-        if (index == 0) return;
-        if (index < 1 || index > readyOrders.size()) {
-            System.out.println("  Invalid selection.");
-            return;
-        }
-
-        var selected = readyOrders.get(index - 1);
-
-        System.out.println("  Payment method:");
-        System.out.println("    1. Cash");
-        System.out.println("    2. PayPal");
-        System.out.println("    3. Credit Card (Stripe)");
-        System.out.print("  Choice: ");
-        String methodChoice = scanner.nextLine().trim();
-
-        // In BaristaView.handleCollectPayment(), replace the inline switch with:
-
-        PaymentGateway gateway = PaymentSetup.promptForPaymentMethod(scanner, selected.getFinalPrice());
-
-        if (gateway == null) {
-            System.out.println("  Payment cancelled.");
-            return;
-        }
-
-        boolean success = chatService.collectPaymentAndFulfill(
-                activeSession, selected.getOrderId(), gateway);
-        System.out.println(success ? "  ✓ Payment processed." : "  ✗ Payment failed.");
-    }
-
     private void handleEndSession() {
         if (activeSession == null) {
             System.out.println("  No active session selected. Use 'switch <id>' first.");
@@ -322,7 +256,6 @@ public class BaristaView implements ChatObserver {
         System.out.println("    dashboard                  show all sessions and their status");
         System.out.println("    switch <session-id>        switch to one of YOUR active sessions");
         System.out.println("    send-to-kitchen <order-id> manually send an order for preparation");
-        System.out.println("    collect-payment             process payment for a READY order");
         System.out.println("    end                        end the current session");
         System.out.println("    back                       deselect the current session");
         System.out.println("    help                       show this help message");

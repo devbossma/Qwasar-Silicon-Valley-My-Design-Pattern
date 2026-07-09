@@ -383,12 +383,15 @@ public class ChatService {
             return false;
         }
 
+        // Mark fulfilled — PersistingOrderObserver will persist this transition
         order.setStatus(OrderStatus.FULFILLED);
         orderRepository.updateStatus(orderId, OrderStatus.FULFILLED.name());
 
-        sendSystemMessage(session.id(),
-                String.format("Payment of $%.2f received for order #%s. Enjoy your coffee!",
-                        order.getFinalPrice(), orderId));
+        // Notify both parties through the session chat
+        sendSystemMessage(session.id(), String.format(
+                "✅ Payment of $%.2f received for order #%s. Transaction complete!",
+                order.getFinalPrice(), orderId));
+
         return true;
     }
 

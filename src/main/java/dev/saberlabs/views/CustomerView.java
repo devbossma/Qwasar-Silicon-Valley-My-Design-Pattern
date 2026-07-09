@@ -1,5 +1,6 @@
 package dev.saberlabs.views;
 
+import dev.saberlabs.adapter.PaymentGateway;
 import dev.saberlabs.auth.AuthException;
 import dev.saberlabs.auth.AuthService;
 import dev.saberlabs.auth.User;
@@ -7,6 +8,8 @@ import dev.saberlabs.chat.ChatMessage;
 import dev.saberlabs.chat.ChatObserver;
 import dev.saberlabs.chat.ChatService;
 import dev.saberlabs.chat.ChatSession;
+import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.payment.PaymentSetup;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -94,6 +97,7 @@ public class CustomerView implements ChatObserver {
                     System.out.println("  Chat session ended.\n");
                     inChat = false;
                 }
+                case "pay" -> handlePayment();
                 case "back" -> {
                     chatService.sendMessage(activeSession.id(), 0, "System",
                             user.username() + " has left the conversation (still reachable).");
@@ -133,6 +137,7 @@ public class CustomerView implements ChatObserver {
         System.out.println();
         System.out.println("  Commands:");
         System.out.println("    order <coffee> [extras]   e.g. order cappuccino milk sugar");
+        System.out.println("    pay                       pay for a READY order");
         System.out.println("    history                   show this session's messages");
         System.out.println("    back                      return to menu (session stays open)");
         System.out.println("    end chat                  close this session");
@@ -204,6 +209,65 @@ public class CustomerView implements ChatObserver {
             System.out.println("  ✓ Password changed.\n");
         } catch (AuthException | IllegalArgumentException e) {
             System.out.println("  ✗ " + e.getMessage() + "\n");
+        }
+    }
+
+    // ================================================================
+    // Payment Handler
+    // ================================================================
+
+    private void handlePayment() {
+        if (activeSession == null) return;
+
+        // Find READY orders for this customer from the persisted table
+        var readyOrders = chatService.getOrderHistory(user).stream()
+                .filter(o -> o.status().equals(OrderStatus.READY.name()))
+                .toList();
+
+        if (readyOrders.isEmpty()) {
+            System.out.println("  No orders ready for payment right now.");
+            return;
+        }
+
+        System.out.println();
+        System.out.println("  ── Orders Ready for Payment ──");
+        for (int i = 0; i < readyOrders.size(); i++) {
+            var order = readyOrders.get(i);
+            String description = order.baseCoffee()
+                    + (order.extras().isEmpty() ? "" : " + " + String.join(" + ", order.extras()));
+            System.out.printf("  %d. %-30s $%.2f (%s)%n",
+                    i + 1, description, order.total(), order.id());
+        }
+
+        System.out.print("  Select order to pay (number, or 0 to cancel): ");
+        int index;
+        try {
+            index = Integer.parseInt(scanner.nextLine().trim());
+        } catch (NumberFormatException e) {
+            System.out.println("  Invalid selection.");
+            return;
+        }
+        if (index == 0) return;
+        if (index < 1 || index > readyOrders.size()) {
+            System.out.println("  Invalid selection.");
+            return;
+        }
+
+        var selected = readyOrders.get(index - 1);
+        PaymentGateway gateway = PaymentSetup.promptForPaymentMethod(scanner, selected.total());
+        if (gateway == null) {
+            System.out.println("  Payment cancelled.");
+            return;
+        }
+
+        boolean success = chatService.collectPaymentAndFulfill(
+                activeSession, selected.id(), gateway);
+
+        if (success) {
+            System.out.printf("  ✓ Payment of $%.2f confirmed. Enjoy your coffee!%n",
+                    selected.total());
+        } else {
+            System.out.println("  ✗ Payment failed. Please try again.");
         }
     }
 

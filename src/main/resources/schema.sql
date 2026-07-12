@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
 
 CREATE TABLE IF NOT EXISTS messages (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    type        TEXT NOT NULL DEFAULT 'CHAT_MESSAGE',  -- CHAT_MESSAGE or SYSTEM_MESSAGE
     session_id  INTEGER NOT NULL,
     sender_id   INTEGER NOT NULL,
     sender_name TEXT NOT NULL,
@@ -41,4 +42,16 @@ CREATE TABLE IF NOT EXISTS orders (
     FOREIGN KEY (customer_id) REFERENCES users(id),
     FOREIGN KEY (barista_id)  REFERENCES users(id),
     FOREIGN KEY (session_id)  REFERENCES chat_sessions(id)
+);
+
+-- New notifications table — user-scoped, not session-scoped
+CREATE TABLE IF NOT EXISTS notifications (
+     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+     user_id     INTEGER NOT NULL,
+     content     TEXT NOT NULL,
+     type        TEXT NOT NULL,                 -- ORDER_READY, ORDER_FULFILLED, SESSION_MATCHED, PAYMENT_RECEIVED
+     reference_id TEXT,                         -- orderId or sessionId this notification is about
+     is_read     INTEGER NOT NULL DEFAULT 0,    -- 0=unread, 1=read
+     timestamp   TEXT NOT NULL,
+     FOREIGN KEY (user_id) REFERENCES users(id)
 );

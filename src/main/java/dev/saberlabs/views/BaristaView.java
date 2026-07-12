@@ -1,10 +1,7 @@
 package dev.saberlabs.views;
 
 import dev.saberlabs.auth.User;
-import dev.saberlabs.chat.ChatMessage;
-import dev.saberlabs.chat.ChatObserver;
-import dev.saberlabs.chat.ChatService;
-import dev.saberlabs.chat.ChatSession;
+import dev.saberlabs.chat.*;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,36 +17,48 @@ import java.util.Scanner;
  * ACTIVE sessions, chat within them, manually send orders to the kitchen,
  * and end sessions.
  */
-public class BaristaView implements ChatObserver {
+public class BaristaView implements ChatObserver, NotificationObserver {
+
 
     private static final String THIN_SEP =
             "────────────────────────────────────────────────────────";
 
     @NotNull private final User user;
     @NotNull private final ChatService chatService;
+    @NotNull private final ChatNotificationService notificationService;
     @NotNull private final CoffeeShop coffeeShop;
     @NotNull private final Scanner scanner;
-
-    /** Which of this barista's sessions is currently displayed, if any. */
     private ChatSession activeSession;
 
     public BaristaView(@NotNull User user,
                        @NotNull ChatService chatService,
+                       @NotNull ChatNotificationService notificationService,
                        @NotNull CoffeeShop coffeeShop,
                        @NotNull Scanner scanner) {
-        this.user = Objects.requireNonNull(user, "User cannot be null");
-        this.chatService = Objects.requireNonNull(chatService, "ChatService cannot be null");
-        this.coffeeShop = Objects.requireNonNull(coffeeShop, "CoffeeShop cannot be null");
-        this.scanner = Objects.requireNonNull(scanner, "Scanner cannot be null");
+        this.user                = Objects.requireNonNull(user);
+        this.chatService         = Objects.requireNonNull(chatService);
+        this.notificationService = Objects.requireNonNull(notificationService);
+        this.coffeeShop          = Objects.requireNonNull(coffeeShop);
+        this.scanner             = Objects.requireNonNull(scanner);
     }
 
     public void run() {
         chatService.registerObserver(this);
+        notificationService.registerObserver(this);
 
         printWelcome();
+
+        // Show unread notifications from previous sessions
+        var unread = notificationService.getUnread(user.id());
+        if (!unread.isEmpty()) {
+            System.out.println("  ── Missed Notifications ──");
+            unread.forEach(n -> System.out.println("  " + n));
+            notificationService.markAllRead(user.id());
+        }
+
         var matched = chatService.baristaReady(user);
         matched.ifPresent(s -> System.out.printf(
-                "  ✓ Immediately matched with a waiting customer (Session #%d)%n", s.id()));
+                "  ✓ Immediately matched with Session #%d%n", s.id()));
 
         printDashboard();
         printHelp();
@@ -60,23 +69,24 @@ public class BaristaView implements ChatObserver {
             String input = scanner.nextLine().trim();
             if (input.isEmpty()) continue;
 
-            String[] parts = input.split("\\s+");
-            String command = parts[0].toLowerCase();
+            String[] parts   = input.split("\\s+");
+            String   command = parts[0].toLowerCase();
 
             switch (command) {
-                case "quit", "exit" -> running = false;
-                case "help" -> printHelp();
-                case "dashboard", "sessions" -> printDashboard();
-                case "switch" -> handleSwitch(parts);
-                case "send-to-kitchen" -> handleSendToKitchen(parts);
-                case "end" -> handleEndSession();
-                case "back" -> activeSession = null;
-                default -> handleChatOrReply(input);
+                case "quit", "exit"      -> running = false;
+                case "help"              -> printHelp();
+                case "dashboard"         -> printDashboard();
+                case "switch"            -> handleSwitch(parts);
+                case "send-to-kitchen"   -> handleSendToKitchen(parts);
+                case "end"               -> handleEndSession();
+                case "back"              -> activeSession = null;
+                default                  -> handleChatOrReply(input);
             }
         }
 
         chatService.baristaOffline(user);
         chatService.removeObserver(this);
+        notificationService.removeObserver(this);
         System.out.println("[" + user.username() + "] Clocking out.\n");
     }
 
@@ -90,7 +100,17 @@ public class BaristaView implements ChatObserver {
         if (message.senderId() == user.id()) return;
 
         System.out.println();
-        System.out.println(message);
+        System.out.println("  " + message);
+        System.out.print("[" + user.username() + "] > ");
+    }
+
+    @Override
+    public void onNotificationReceived(@NotNull ChatNotification notification) {
+        // Only display if this notification targets the current barista
+        if (notification.userId() != user.id()) return;
+
+        System.out.println();
+        System.out.println("  " + notification);
         System.out.print("[" + user.username() + "] > ");
     }
 
@@ -157,9 +177,15 @@ public class BaristaView implements ChatObserver {
         System.out.println("  ── Pending Orders (not yet sent to kitchen) ──");
         for (int i = 0; i < pending.size(); i++) {
             var order = pending.get(i);
-            System.out.printf("  %d. %-30s $%-8.2f (%s)%n",
-                    i + 1, order.baseCoffee() + (order.extras().isEmpty() ? "" : " + " + String.join(" + ", order.extras())),
-                    order.total(), order.id());
+            String description = order.baseCoffee()
+                    + (order.extras().isEmpty() ? "" : " + " + String.join(" + ", order.extras()));
+            System.out.printf("  %d. [%-8s] %-28s $%.2f  placed: %s%n",
+                    i + 1,
+                    order.id(),                                    // ← prominent ID
+                    description,
+                    order.total(),
+                    order.createdAt().toLocalTime()                // ← timestamp distinguishes duplicates
+                            .toString().substring(0, 5));
         }
         System.out.print("  Select order to send to kitchen (number, or 0 to cancel): ");
 

@@ -1,5 +1,6 @@
 package dev.saberlabs.order;
 
+import dev.saberlabs.chat.ChatNotificationService;
 import dev.saberlabs.chat.repositories.ChatOrderRepository;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
@@ -26,28 +27,32 @@ import java.util.Objects;
 public class PersistingOrderObserver implements OrderObserver {
 
     @NotNull private final ChatOrderRepository orderRepository;
+    @NotNull private final ChatNotificationService notificationService;
 
-    public PersistingOrderObserver(@NotNull ChatOrderRepository orderRepository) {
-        this.orderRepository = Objects.requireNonNull(
-                orderRepository, "ChatOrderRepository cannot be null");
+    public PersistingOrderObserver(@NotNull ChatOrderRepository orderRepository,
+                                   @NotNull ChatNotificationService notificationService) {
+        this.orderRepository = Objects.requireNonNull(orderRepository);
+        this.notificationService = Objects.requireNonNull(notificationService);
     }
 
     @Override
     public void update(@NotNull Order order, @NotNull OrderStatus event) {
-        // Skip PLACED — that's already persisted by ChatService.handleOrderCommand()
-        // Skip PREPARING — that's already persisted by ChatService.sendOrderToKitchen()
-        // Mirror everything else: READY, FULFILLED, CANCELLED
-        if (event == OrderStatus.PLACED || event == OrderStatus.PREPARING) {
-            return;
-        }
+        if (event == OrderStatus.PLACED || event == OrderStatus.PREPARING) return;
 
-        try {
+        orderRepository.findById(order.getOrderId()).ifPresent(stored -> {
             orderRepository.updateStatus(order.getOrderId(), event.name());
-        } catch (RuntimeException e) {
-            // The order may not exist in the orders table if it was placed
-            // outside the chat flow (e.g. via CLI or tests) — log but don't crash
-            System.err.printf("[PersistingOrderObserver] Could not update status for " +
-                    "order %s to %s: %s%n", order.getOrderId(), event, e.getMessage());
-        }
+
+            switch (event) {
+                case READY -> notificationService.notifyOrderReady(
+                        stored.customerId(),
+                        order.getOrderId(),
+                        order.getCoffee().getDescription());
+
+                case FULFILLED -> notificationService.notifyOrderFulfilled(
+                        stored.customerId(), order.getOrderId());
+
+                default -> { }
+            }
+        });
     }
 }

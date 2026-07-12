@@ -41,6 +41,7 @@ public class ChatService {
     @NotNull private final ChatRepository chatRepository;
     @NotNull private final ChatSessionRepository sessionRepository;
     @NotNull private final ChatOrderRepository orderRepository;
+    @NotNull private final ChatNotificationService notificationService;
     @NotNull private final BaristaQueue baristaQueue;
     @NotNull private final CoffeeShop coffeeShop;
 
@@ -58,13 +59,15 @@ public class ChatService {
     public ChatService(@NotNull ChatRepository chatRepository,
                        @NotNull ChatSessionRepository sessionRepository,
                        @NotNull ChatOrderRepository orderRepository,
+                       @NotNull ChatNotificationService notificationService,
                        @NotNull BaristaQueue baristaQueue,
                        @NotNull CoffeeShop coffeeShop) {
-        this.chatRepository = Objects.requireNonNull(chatRepository, "ChatRepository cannot be null");
-        this.sessionRepository = Objects.requireNonNull(sessionRepository, "ChatSessionRepository cannot be null");
-        this.orderRepository = Objects.requireNonNull(orderRepository, "ChatOrderRepository cannot be null");
-        this.baristaQueue = Objects.requireNonNull(baristaQueue, "BaristaQueue cannot be null");
-        this.coffeeShop = Objects.requireNonNull(coffeeShop, "CoffeeShop cannot be null");
+        this.chatRepository      = Objects.requireNonNull(chatRepository);
+        this.sessionRepository   = Objects.requireNonNull(sessionRepository);
+        this.orderRepository     = Objects.requireNonNull(orderRepository);
+        this.notificationService = Objects.requireNonNull(notificationService);
+        this.baristaQueue        = Objects.requireNonNull(baristaQueue);
+        this.coffeeShop          = Objects.requireNonNull(coffeeShop);
     }
 
     // ================================================================
@@ -181,21 +184,19 @@ public class ChatService {
 
     public @NotNull ChatMessage sendMessage(long sessionId, long senderId,
                                             @NotNull String senderName,
-                                            @NotNull String content) {
-        return sendMessage(sessionId, senderId, senderName, content, null);
+                                            @NotNull String content,
+                                            @Nullable String orderId) {
+        ChatMessage message = ChatMessage.of(MessageType.CHAT_MESSAGE, sessionId, senderId, senderName,
+                content, orderId);  // ← type added
+        ChatMessage saved = chatRepository.save(message);
+        notifyObservers(saved);
+        return saved;
     }
 
     public @NotNull ChatMessage sendMessage(long sessionId, long senderId,
                                             @NotNull String senderName,
-                                            @NotNull String content,
-                                            @Nullable String orderId) {
-        Objects.requireNonNull(senderName, "Sender name cannot be null");
-        Objects.requireNonNull(content, "Content cannot be null");
-
-        ChatMessage message = ChatMessage.of(sessionId, senderId, senderName, content, orderId);
-        ChatMessage saved = chatRepository.save(message);
-        notifyObservers(saved);
-        return saved;
+                                            @NotNull String content) {
+        return sendMessage(sessionId, senderId, senderName, content, null);
     }
 
     public @NotNull ChatMessage processCustomerInput(@NotNull User user,
@@ -385,6 +386,11 @@ public class ChatService {
 
         // Mark fulfilled — PersistingOrderObserver will persist this transition
         order.setStatus(OrderStatus.FULFILLED);
+        notificationService.notifyPaymentReceived(
+                session.baristaId() != null ? session.baristaId() : 0L,
+                orderId,
+                order.getFinalPrice(),
+                order.getCustomer().getName());
         orderRepository.updateStatus(orderId, OrderStatus.FULFILLED.name());
 
         // Notify both parties through the session chat
@@ -404,8 +410,13 @@ public class ChatService {
         };
     }
 
-    private @NotNull ChatMessage sendSystemMessage(long sessionId, @NotNull String content) {
-        return sendMessage(sessionId, 0, "System", content);
+    private @NotNull ChatMessage sendSystemMessage(long sessionId,
+                                                   @NotNull String content) {
+        ChatMessage message = ChatMessage.of(MessageType.SYSTEM_MESSAGE, sessionId, 0, "System",
+                content,  null);  // ← type added
+        ChatMessage saved = chatRepository.save(message);
+        notifyObservers(saved);
+        return saved;
     }
 
     // ================================================================
@@ -454,8 +465,13 @@ public class ChatService {
     }
 
     private void notifySessionMatched(@NotNull ChatSession session) {
+        // System message in the session transcript (both parties see it)
         sendSystemMessage(session.id(),
                 "You are now connected. Barista ID: " + session.baristaId());
+
+        // User-scoped notification for the customer specifically
+        notificationService.notifySessionMatched(
+                session.customerId(), session.baristaId(), session.id());
     }
 
     /**

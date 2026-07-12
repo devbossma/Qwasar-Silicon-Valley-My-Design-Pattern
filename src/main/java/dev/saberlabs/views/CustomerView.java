@@ -4,10 +4,7 @@ import dev.saberlabs.adapter.PaymentGateway;
 import dev.saberlabs.auth.AuthException;
 import dev.saberlabs.auth.AuthService;
 import dev.saberlabs.auth.User;
-import dev.saberlabs.chat.ChatMessage;
-import dev.saberlabs.chat.ChatObserver;
-import dev.saberlabs.chat.ChatService;
-import dev.saberlabs.chat.ChatSession;
+import dev.saberlabs.chat.*;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.payment.PaymentSetup;
 import org.jetbrains.annotations.NotNull;
@@ -20,48 +17,60 @@ import java.util.Scanner;
  * Console view for an authenticated CUSTOMER — the four-option menu:
  * Start Chat, My Order History, My Info, Quit.
  */
-public class CustomerView implements ChatObserver {
+public class CustomerView implements ChatObserver, NotificationObserver {
 
     private static final String THIN_SEP =
             "────────────────────────────────────────────────────────";
 
     @NotNull private final User user;
     @NotNull private final ChatService chatService;
+    @NotNull private final ChatNotificationService notificationService;
     @NotNull private final AuthService authService;
     @NotNull private final Scanner scanner;
-
-    /** The session currently displayed in the chat sub-loop, if any. */
     private ChatSession activeSession;
 
     public CustomerView(@NotNull User user,
                         @NotNull ChatService chatService,
+                        @NotNull ChatNotificationService notificationService,
                         @NotNull AuthService authService,
                         @NotNull Scanner scanner) {
-        this.user = Objects.requireNonNull(user, "User cannot be null");
-        this.chatService = Objects.requireNonNull(chatService, "ChatService cannot be null");
-        this.authService = Objects.requireNonNull(authService, "AuthService cannot be null");
-        this.scanner = Objects.requireNonNull(scanner, "Scanner cannot be null");
+        this.user                = Objects.requireNonNull(user);
+        this.chatService         = Objects.requireNonNull(chatService);
+        this.notificationService = Objects.requireNonNull(notificationService);
+        this.authService         = Objects.requireNonNull(authService);
+        this.scanner             = Objects.requireNonNull(scanner);
     }
 
     /**
      * Runs the customer's main menu loop until they choose Quit.
      */
     public void run() {
-        chatService.resolveCustomer(user); // ensure Customer profile exists
+        chatService.resolveCustomer(user);
+        notificationService.registerObserver(this);
+
+        // Show unread notifications from previous sessions
+        var unread = notificationService.getUnread(user.id());
+        if (!unread.isEmpty()) {
+            System.out.println();
+            System.out.println("  ── Missed Notifications ──");
+            unread.forEach(n -> System.out.println("  " + n));
+            notificationService.markAllRead(user.id());
+        }
 
         boolean running = true;
         while (running) {
             printMenu();
             String choice = scanner.nextLine().trim();
-
             switch (choice) {
                 case "1" -> runChatSubLoop();
                 case "2" -> printOrderHistory();
                 case "3" -> runMyInfoMenu();
                 case "4" -> running = false;
-                default -> System.out.println("  Invalid choice.\n");
+                default  -> System.out.println("  Invalid choice.\n");
             }
         }
+
+        notificationService.removeObserver(this);
         System.out.println("[" + user.username() + "] Goodbye!\n");
     }
 
@@ -116,10 +125,10 @@ public class CustomerView implements ChatObserver {
     @Override
     public void onMessageReceived(@NotNull ChatMessage message) {
         if (activeSession == null || message.sessionId() != activeSession.id()) return;
-        if (message.senderId() == user.id()) return; // don't echo own messages
+        if (message.senderId() == user.id()) return;
 
         System.out.println();
-        System.out.println(message);
+        System.out.println("  " + message);
         System.out.print("[" + user.username() + "] > ");
     }
 
@@ -285,5 +294,15 @@ public class CustomerView implements ChatObserver {
         System.out.println("  3. My Info");
         System.out.println("  4. Quit");
         System.out.print("\n  Your choice: ");
+    }
+
+    @Override
+    public void onNotificationReceived(@NotNull ChatNotification notification) {
+        // Only display if this notification targets the current user
+        if (notification.userId() != user.id()) return;
+
+        System.out.println();
+        System.out.println("  " + notification);
+        System.out.print("[" + user.username() + "] > ");
     }
 }

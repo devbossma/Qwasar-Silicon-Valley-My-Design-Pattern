@@ -48,6 +48,32 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.53.2.0</version>
         </dependency>
+
+        <!-- Source: https://mvnrepository.com/artifact/org.openjfx/javafx-fxml -->
+        <!-- JavaFX FXML -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>26</version>
+        </dependency>
+
+        <!-- Source: https://mvnrepository.com/artifact/org.openjfx/javafx-controls -->
+        <!-- JavaFX Controls -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>26</version>
+        </dependency>
+
+        <!-- Source: https://mvnrepository.com/artifact/org.openjfx/javafx-swing -->
+        <!-- JavaFX Swing interop for images rendering -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-swing</artifactId>
+            <version>26</version>
+        </dependency>
+
+
     </dependencies>
 
     <build>
@@ -64,6 +90,15 @@
                 <configuration>
                     <target>25</target>
                     <source>25</source>
+                </configuration>
+            </plugin>
+            <!-- JavaFX Maven Plugin — run with: mvn javafx:run -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>dev.saberlabs.CoffeeChatAppFX</mainClass>
                 </configuration>
             </plugin>
         </plugins>

@@ -55,3 +55,14 @@ CREATE TABLE IF NOT EXISTS notifications (
      timestamp   TEXT NOT NULL,
      FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS image_uploads (
+     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+     session_id  INTEGER NOT NULL,
+     sender_id   INTEGER NOT NULL,
+     filename    TEXT NOT NULL,
+     data        BLOB NOT NULL,
+     timestamp   TEXT NOT NULL,
+     FOREIGN KEY (session_id) REFERENCES chat_sessions(id),
+     FOREIGN KEY (sender_id)  REFERENCES users(id)
+);

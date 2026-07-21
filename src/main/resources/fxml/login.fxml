@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="dev.saberlabs.fx.controllers.LoginController"
+      alignment="CENTER"
+      spacing="0"
+      style="-fx-background-color: #1a1a2e;">
+
+    <!-- Header -->
+    <VBox alignment="CENTER" style="-fx-background-color: #16213e;" spacing="4">
+        <padding><Insets top="32" bottom="32" left="40" right="40"/></padding>
+        <Label text="☕" style="-fx-font-size: 40px;"/>
+        <Label text="Coffee Chat"
+               style="-fx-font-size: 26px; -fx-font-weight: bold;
+                      -fx-text-fill: #e2b96f;"/>
+        <Label text="Your café companion"
+               style="-fx-font-size: 12px; -fx-text-fill: #8888aa;"/>
+    </VBox>
+
+    <!-- Tab bar -->
+    <HBox style="-fx-background-color: #0f3460;" spacing="0">
+        <Button fx:id="loginTabBtn"   text="Login"
+                onAction="#switchToLogin"
+                styleClass="tab-btn-active"
+                maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+        <Button fx:id="registerTabBtn" text="Register"
+                onAction="#switchToRegister"
+                styleClass="tab-btn"
+                maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+    </HBox>
+
+    <!-- Form container -->
+    <StackPane VBox.vgrow="ALWAYS">
+        <padding><Insets top="32" bottom="32" left="48" right="48"/></padding>
+
+        <!-- Login form -->
+        <VBox fx:id="loginPane" spacing="14" alignment="CENTER_LEFT">
+            <Label text="Username" styleClass="field-label"/>
+            <TextField fx:id="loginUsername" promptText="Enter your username"
+                       styleClass="chat-field"/>
+            <Label text="Password" styleClass="field-label"/>
+            <PasswordField fx:id="loginPassword" promptText="Enter your password"
+                           styleClass="chat-field"
+                           onAction="#handleLogin"/>
+            <Label fx:id="loginError" styleClass="error-label" wrapText="true"/>
+            <Button text="Login →" onAction="#handleLogin"
+                    styleClass="primary-btn" maxWidth="Infinity"/>
+        </VBox>
+
+        <!-- Register form -->
+        <VBox fx:id="registerPane" spacing="14" alignment="CENTER_LEFT"
+              visible="false" managed="false">
+            <Label text="Username" styleClass="field-label"/>
+            <TextField fx:id="regUsername" promptText="At least 3 characters"
+                       styleClass="chat-field"/>
+            <Label text="Password" styleClass="field-label"/>
+            <PasswordField fx:id="regPassword" promptText="At least 6 characters"
+                           styleClass="chat-field"/>
+            <Label fx:id="registerError" styleClass="error-label" wrapText="true"/>
+            <Button text="Create Account →" onAction="#handleRegister"
+                    styleClass="primary-btn" maxWidth="Infinity"/>
+        </VBox>
+    </StackPane>
+
+</VBox>

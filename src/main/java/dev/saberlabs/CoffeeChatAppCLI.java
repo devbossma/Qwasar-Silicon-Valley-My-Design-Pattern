@@ -39,7 +39,7 @@ import java.util.Scanner;
  * 8.  Login → route by role → view loop
  * 9.  Graceful shutdown
  */
-public class CoffeeChatApp {
+public class CoffeeChatAppCLI {
 
     private static final int QUEUE_CAPACITY    = 10;
     private static final int NUMBER_OF_BARISTAS = 2;

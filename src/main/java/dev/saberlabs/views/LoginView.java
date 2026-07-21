@@ -1,5 +1,6 @@
 package dev.saberlabs.views;
 
+import dev.saberlabs.CoffeeChatAppCLI;
 import dev.saberlabs.auth.AuthException;
 import dev.saberlabs.auth.AuthService;
 import dev.saberlabs.auth.Role;
@@ -12,7 +13,7 @@ import java.util.Scanner;
 /**
  * Console-based login/registration screen — the entry point of the
  * authentication flow. Routes the authenticated user to the correct
- * role-based view from {@link dev.saberlabs.CoffeeChatApp}.
+ * role-based view from {@link CoffeeChatAppCLI}.
  *
  * Only CUSTOMER self-registration is offered here. BARISTA accounts
  * are created exclusively by a MANAGER via {@link ManagerView}.

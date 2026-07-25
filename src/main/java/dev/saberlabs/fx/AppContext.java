@@ -159,4 +159,8 @@ public class AppContext {
     public void setCurrentUser(@Nullable User user) {
         this.currentUser = user;
     }
+
+    public @NotNull ChatOrderRepository getOrderRepository() {
+        return orderRepository;
+    }
 }

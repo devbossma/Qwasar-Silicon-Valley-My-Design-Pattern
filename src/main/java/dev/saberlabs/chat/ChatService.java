@@ -29,7 +29,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * Coordinates the full chat experience: barista-pool session matching,
  * message persistence, order placement via chat commands, and Observer
  * notifications to console/UI listeners.
- *
+ * *
  * Order ID continuity is owned by {@link ChatOrderRepository#nextOrderId()},
  * which queries the actual orders table rather than trusting an in-memory
  * counter — this is what survives application restarts without ID collisions.
@@ -167,13 +167,17 @@ public class ChatService {
                 .peek(baristaQueue::customerWaiting)
                 .count();
 
-        long activeRecovered = all.stream()
-                .filter(ChatSession::isActive)
-                .count();
+        long activeRecovered = 0;
+        for (ChatSession session : all) {
+            if (session.isActive() && session.baristaId() != null) {
+                baristaQueue.restoreActiveAssignment(session.id(), session.baristaId());
+                activeRecovered++;
+            }
+        }
 
         System.out.printf(
                 "[ChatService] Startup recovery: %d WAITING session(s) re-queued, " +
-                        "%d ACTIVE session(s) acknowledged (their baristas remain busy " +
+                        "%d ACTIVE session(s) restored (their baristas remain busy " +
                         "until they go READY again or the session ends).%n",
                 waitingRecovered, activeRecovered);
     }
@@ -187,7 +191,7 @@ public class ChatService {
                                             @NotNull String content,
                                             @Nullable String orderId) {
         ChatMessage message = ChatMessage.of(MessageType.CHAT_MESSAGE, sessionId, senderId, senderName,
-                content, orderId);  // ← type added
+                content, orderId);
         ChatMessage saved = chatRepository.save(message);
         notifyObservers(saved);
         return saved;
@@ -199,18 +203,19 @@ public class ChatService {
         return sendMessage(sessionId, senderId, senderName, content, null);
     }
 
-    public @NotNull ChatMessage processCustomerInput(@NotNull User user,
-                                                     @NotNull ChatSession session,
-                                                     @NotNull String input) {
+    public void processCustomerInput(@NotNull User user,
+                                     @NotNull ChatSession session,
+                                     @NotNull String input) {
         Objects.requireNonNull(user, "User cannot be null");
         Objects.requireNonNull(session, "Session cannot be null");
         Objects.requireNonNull(input, "Input cannot be null");
 
         String trimmed = input.trim();
         if (trimmed.toLowerCase(Locale.ROOT).startsWith(ORDER_COMMAND)) {
-            return handleOrderCommand(user, session, trimmed);
+            handleOrderCommand(user, session, trimmed);
+            return;
         }
-        return sendMessage(session.id(), user.id(), user.username(), trimmed);
+        sendMessage(session.id(), user.id(), user.username(), trimmed);
     }
 
     // ================================================================
@@ -434,6 +439,15 @@ public class ChatService {
     public @NotNull List<StoredOrder> getOrderHistory(@NotNull User user) {
         Objects.requireNonNull(user, "User cannot be null");
         return orderRepository.findByCustomer(user.id());
+    }
+
+    /**
+     * Returns all orders in the system, newest first. Used by ManagerView
+     * for a global audit of all orders, regardless of customer or session.
+     * @return unmodifiable list of all orders in the system
+     */
+    public @NotNull List<StoredOrder> getAllOrders() {
+        return orderRepository.findAll();
     }
 
     // ================================================================

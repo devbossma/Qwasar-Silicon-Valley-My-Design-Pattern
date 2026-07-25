@@ -79,12 +79,16 @@ public class LoginController {
 
         try {
             User user = authService.login(username, password);
-            AppContext.getInstance().setCurrentUser(user);
             routeByRole(user);
         } catch (AuthException e) {
             loginError.setText(e.getMessage());
             loginPassword.clear();
         }
+    }
+
+    @FXML
+    private void handleOpenSecondLoginWindow() {
+        SceneRouter.openNewLoginWindow("☕ Coffee Chat — Window 2");
     }
 
     // ================================================================
@@ -103,7 +107,6 @@ public class LoginController {
 
         try {
             User user = authService.register(username, password);
-            AppContext.getInstance().setCurrentUser(user);
             routeByRole(user);
         } catch (IllegalArgumentException e) {
             registerError.setText(e.getMessage());
@@ -117,11 +120,11 @@ public class LoginController {
     private void routeByRole(User user) {
         switch (user.role()) {
             case CUSTOMER -> SceneRouter.navigateTo("/fxml/customer.fxml",
-                    "☕ Coffee Chat — " + user.username());
+                    "☕ Coffee Chat — " + user.username(), user);
             case BARISTA  -> SceneRouter.navigateTo("/fxml/barista.fxml",
-                    "☕ Barista Dashboard — " + user.username());
+                    "☕ Barista Dashboard — " + user.username(), user);
             case MANAGER  -> SceneRouter.navigateTo("/fxml/manager.fxml",
-                    "☕ Manager — " + user.username());
+                    "☕ Manager — " + user.username(), user);
         }
     }
 

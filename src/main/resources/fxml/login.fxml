@@ -1,70 +1,55 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.geometry.Insets?>
+<?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
-<VBox xmlns="http://javafx.com/javafx/21"
-      xmlns:fx="http://javafx.com/fxml/1"
-      fx:controller="dev.saberlabs.fx.controllers.LoginController"
-      alignment="CENTER"
-      spacing="0"
-      style="-fx-background-color: #1a1a2e;">
+<VBox alignment="CENTER" spacing="0" style="-fx-background-color: #1a1a2e;" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="dev.saberlabs.fx.controllers.LoginController">
 
     <!-- Header -->
-    <VBox alignment="CENTER" style="-fx-background-color: #16213e;" spacing="4">
-        <padding><Insets top="32" bottom="32" left="40" right="40"/></padding>
-        <Label text="☕" style="-fx-font-size: 40px;"/>
-        <Label text="Coffee Chat"
-               style="-fx-font-size: 26px; -fx-font-weight: bold;
-                      -fx-text-fill: #e2b96f;"/>
-        <Label text="Your café companion"
-               style="-fx-font-size: 12px; -fx-text-fill: #8888aa;"/>
+    <VBox alignment="CENTER" spacing="4" style="-fx-background-color: #16213e;">
+        <padding><Insets bottom="32" left="40" right="40" top="32" /></padding>
+        <Label style="-fx-font-size: 40px;" text="☕" textFill="#795702">
+         <font>
+            <Font size="16.0" />
+         </font></Label>
+        <Label style="-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #e2b96f;" text="Coffee Chat" />
+        <Label style="-fx-font-size: 12px; -fx-text-fill: #8888aa;" text="Your café companion" />
     </VBox>
 
     <!-- Tab bar -->
-    <HBox style="-fx-background-color: #0f3460;" spacing="0">
-        <Button fx:id="loginTabBtn"   text="Login"
-                onAction="#switchToLogin"
-                styleClass="tab-btn-active"
-                maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
-        <Button fx:id="registerTabBtn" text="Register"
-                onAction="#switchToRegister"
-                styleClass="tab-btn"
-                maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+    <HBox spacing="0" style="-fx-background-color: #0f3460;">
+        <Button fx:id="loginTabBtn" maxWidth="Infinity" onAction="#switchToLogin" styleClass="tab-btn-active" text="Login" HBox.hgrow="ALWAYS" />
+        <Button fx:id="registerTabBtn" maxWidth="Infinity" onAction="#switchToRegister" styleClass="tab-btn" text="Register" HBox.hgrow="ALWAYS" />
     </HBox>
 
     <!-- Form container -->
     <StackPane VBox.vgrow="ALWAYS">
-        <padding><Insets top="32" bottom="32" left="48" right="48"/></padding>
+        <padding><Insets bottom="32" left="48" right="48" top="32" /></padding>
 
         <!-- Login form -->
-        <VBox fx:id="loginPane" spacing="14" alignment="CENTER_LEFT">
-            <Label text="Username" styleClass="field-label"/>
-            <TextField fx:id="loginUsername" promptText="Enter your username"
-                       styleClass="chat-field"/>
-            <Label text="Password" styleClass="field-label"/>
-            <PasswordField fx:id="loginPassword" promptText="Enter your password"
-                           styleClass="chat-field"
-                           onAction="#handleLogin"/>
-            <Label fx:id="loginError" styleClass="error-label" wrapText="true"/>
-            <Button text="Login →" onAction="#handleLogin"
-                    styleClass="primary-btn" maxWidth="Infinity"/>
+        <VBox fx:id="loginPane" alignment="CENTER_LEFT" spacing="14">
+            <Label styleClass="field-label" text="Username" />
+            <TextField fx:id="loginUsername" promptText="Enter your username" styleClass="chat-field" />
+            <Label styleClass="field-label" text="Password" />
+            <PasswordField fx:id="loginPassword" onAction="#handleLogin" promptText="Enter your password" styleClass="chat-field" />
+            <Label fx:id="loginError" styleClass="error-label" wrapText="true" />
+            <Button maxWidth="Infinity" onAction="#handleLogin" styleClass="primary-btn" text="Login →" />
+            <Button text="🪟 Open Another Window (for testing multiple roles)"
+                    onAction="#handleOpenSecondLoginWindow"
+                    styleClass="secondary-btn"
+                    style="-fx-font-size: 10px;"/>
         </VBox>
 
         <!-- Register form -->
-        <VBox fx:id="registerPane" spacing="14" alignment="CENTER_LEFT"
-              visible="false" managed="false">
-            <Label text="Username" styleClass="field-label"/>
-            <TextField fx:id="regUsername" promptText="At least 3 characters"
-                       styleClass="chat-field"/>
-            <Label text="Password" styleClass="field-label"/>
-            <PasswordField fx:id="regPassword" promptText="At least 6 characters"
-                           styleClass="chat-field"/>
-            <Label fx:id="registerError" styleClass="error-label" wrapText="true"/>
-            <Button text="Create Account →" onAction="#handleRegister"
-                    styleClass="primary-btn" maxWidth="Infinity"/>
+        <VBox fx:id="registerPane" alignment="CENTER_LEFT" managed="false" spacing="14" visible="false">
+            <Label styleClass="field-label" text="Username" />
+            <TextField fx:id="regUsername" promptText="At least 3 characters" styleClass="chat-field" />
+            <Label styleClass="field-label" text="Password" />
+            <PasswordField fx:id="regPassword" promptText="At least 6 characters" styleClass="chat-field" />
+            <Label fx:id="registerError" styleClass="error-label" wrapText="true" />
+            <Button maxWidth="Infinity" onAction="#handleRegister" styleClass="primary-btn" text="Create Account →" />
         </VBox>
     </StackPane>
 

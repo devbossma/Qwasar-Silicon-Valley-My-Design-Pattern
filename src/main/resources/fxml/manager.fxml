@@ -1,14 +1,163 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.*?>
-<?import java.util.*?>
-<?import javafx.scene.*?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="ManagerController"
-            prefHeight="400.0" prefWidth="600.0">
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="dev.saberlabs.fx.controllers.ManagerController"
+            style="-fx-background-color: #1a1a2e;"
+            prefWidth="1000" prefHeight="640">
 
-</AnchorPane>
+    <!-- ── Top bar ──────────────────────────────────────────────────── -->
+    <top>
+        <HBox style="-fx-background-color: #16213e; -fx-border-color: #2a2a5a;
+                     -fx-border-width: 0 0 1 0;"
+              alignment="CENTER_LEFT" spacing="12">
+            <padding><Insets top="12" bottom="12" left="16" right="16"/></padding>
+            <Label text="☕" style="-fx-font-size: 20px;"/>
+            <Label text="Manager Dashboard" style="-fx-text-fill: #e2b96f;
+                   -fx-font-weight: bold; -fx-font-size: 15px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="usernameLabel"
+                   style="-fx-text-fill: #8888aa; -fx-font-size: 12px;"/>
+            <Button text="Logout" onAction="#handleLogout" styleClass="danger-btn"/>
+        </HBox>
+    </top>
+
+    <center>
+        <TabPane style="-fx-background-color: #1a1a2e; -fx-tab-min-width: 130px;">
+
+            <!-- ── Tab 1: Users ─────────────────────────────────────── -->
+            <Tab text="👥 Users" closable="false">
+                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
+
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <TextField fx:id="newBaristaUsername" styleClass="chat-field"
+                                   promptText="Username" prefWidth="160"/>
+                        <PasswordField fx:id="newBaristaPassword" styleClass="chat-field"
+                                       promptText="Password" prefWidth="160"/>
+                        <Button text="+ Create Barista"
+                                onAction="#handleCreateBarista"
+                                styleClass="primary-btn"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="🔄 Refresh"
+                                onAction="#refreshUsers"
+                                styleClass="secondary-btn"/>
+                    </HBox>
+                    <Label fx:id="userActionError" styleClass="error-label"/>
+
+                    <TableView fx:id="usersTable" styleClass="image-list" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="userIdCol"       text="ID"       prefWidth="60"/>
+                            <TableColumn fx:id="userNameCol"     text="Username" prefWidth="180"/>
+                            <TableColumn fx:id="userRoleCol"     text="Role"     prefWidth="120"/>
+                            <TableColumn fx:id="userCreatedCol"  text="Created"  prefWidth="150"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No users" style="-fx-text-fill: #555577;"/>
+                        </placeholder>
+                    </TableView>
+
+                    <HBox spacing="10">
+                        <Button text="🗑 Delete Selected User"
+                                onAction="#handleDeleteUser"
+                                styleClass="danger-btn"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+
+            <!-- ── Tab 2: Sessions ──────────────────────────────────── -->
+            <Tab text="💬 Sessions" closable="false">
+                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
+
+                    <HBox alignment="CENTER_LEFT" spacing="10">
+                        <Label text="All Chat Sessions"
+                               style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
+                                      -fx-font-size: 14px;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="🔄 Refresh"
+                                onAction="#refreshSessions"
+                                styleClass="secondary-btn"/>
+                    </HBox>
+
+                    <TableView fx:id="sessionsTable" styleClass="image-list" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="sessIdCol"       text="ID"         prefWidth="60"/>
+                            <TableColumn fx:id="sessCustomerCol" text="Customer"   prefWidth="100"/>
+                            <TableColumn fx:id="sessBaristaCol"  text="Barista"    prefWidth="100"/>
+                            <TableColumn fx:id="sessStatusCol"   text="Status"     prefWidth="120"/>
+                            <TableColumn fx:id="sessCreatedCol"  text="Created"    prefWidth="150"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No sessions" style="-fx-text-fill: #555577;"/>
+                        </placeholder>
+                    </TableView>
+
+                    <Label text="Conversation for selected session"
+                           style="-fx-text-fill: #aaaacc; -fx-font-size: 12px;"/>
+                    <TextArea fx:id="sessionHistoryArea"
+                              styleClass="chat-area"
+                              editable="false"
+                              wrapText="true"
+                              prefHeight="180"/>
+                </VBox>
+            </Tab>
+
+            <!-- ── Tab 3: All Messages ──────────────────────────────── -->
+            <Tab text="📜 All Messages" closable="false">
+                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
+                    <HBox alignment="CENTER_LEFT" spacing="10">
+                        <Label text="Global Audit Log"
+                               style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
+                                      -fx-font-size: 14px;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="🔄 Refresh"
+                                onAction="#refreshAllMessages"
+                                styleClass="secondary-btn"/>
+                    </HBox>
+                    <TextArea fx:id="allMessagesArea"
+                              styleClass="chat-area"
+                              editable="false"
+                              wrapText="true"
+                              VBox.vgrow="ALWAYS"/>
+                </VBox>
+            </Tab>
+
+            <!-- ── Tab 4: Orders ────────────────────────────────────── -->
+            <Tab text="🧾 Orders" closable="false">
+                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
+                    <HBox alignment="CENTER_LEFT" spacing="10">
+                        <Label text="All Orders"
+                               style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
+                                      -fx-font-size: 14px;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Button text="🔄 Refresh"
+                                onAction="#refreshOrders"
+                                styleClass="secondary-btn"/>
+                    </HBox>
+                    <TableView fx:id="ordersTable" styleClass="image-list" VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="ordIdCol2"       text="Order #"    prefWidth="90"/>
+                            <TableColumn fx:id="ordCustomerCol"  text="Customer"   prefWidth="90"/>
+                            <TableColumn fx:id="ordBaristaCol"   text="Barista"    prefWidth="90"/>
+                            <TableColumn fx:id="ordCoffeeCol2"   text="Coffee"     prefWidth="180"/>
+                            <TableColumn fx:id="ordTotalCol2"    text="Total"      prefWidth="80"/>
+                            <TableColumn fx:id="ordStatusCol2"   text="Status"     prefWidth="100"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No orders" style="-fx-text-fill: #555577;"/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+            </Tab>
+
+        </TabPane>
+    </center>
+
+</BorderPane>

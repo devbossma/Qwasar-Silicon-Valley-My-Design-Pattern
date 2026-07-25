@@ -1,14 +1,122 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.*?>
-<?import java.util.*?>
-<?import javafx.scene.*?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="BaristaController"
-            prefHeight="400.0" prefWidth="600.0">
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="dev.saberlabs.fx.controllers.BaristaController"
+            style="-fx-background-color: #1a1a2e;"
+            prefWidth="1100" prefHeight="680">
 
-</AnchorPane>
+    <!-- ── Top bar ──────────────────────────────────────────────────── -->
+    <top>
+        <HBox style="-fx-background-color: #16213e; -fx-border-color: #2a2a5a;
+                     -fx-border-width: 0 0 1 0;"
+              alignment="CENTER_LEFT" spacing="12">
+            <padding><Insets top="12" bottom="12" left="16" right="16"/></padding>
+            <Label text="☕" style="-fx-font-size: 20px;"/>
+            <Label text="Barista Dashboard" style="-fx-text-fill: #e2b96f;
+                   -fx-font-weight: bold; -fx-font-size: 15px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="usernameLabel"
+                   style="-fx-text-fill: #8888aa; -fx-font-size: 12px;"/>
+            <Label fx:id="queueLabel"
+                   style="-fx-text-fill: #44cc88; -fx-font-size: 11px;
+                          -fx-background-color: #1a3a2a; -fx-padding: 2 8;
+                          -fx-background-radius: 4;"/>
+            <Button text="Logout" onAction="#handleLogout" styleClass="danger-btn"/>
+        </HBox>
+    </top>
+
+    <!-- ── Left sidebar: all sessions ──────────────────────────────── -->
+    <left>
+        <VBox styleClass="sidebar" spacing="10" prefWidth="280">
+            <padding><Insets top="14" bottom="14" left="14" right="14"/></padding>
+
+            <HBox alignment="CENTER_LEFT" spacing="8">
+                <Label text="All Sessions" styleClass="sidebar-title"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button text="🔄" onAction="#refreshDashboard"
+                        styleClass="secondary-btn" style="-fx-padding: 2 8;"/>
+            </HBox>
+
+            <ListView fx:id="sessionListView"
+                      styleClass="image-list"
+                      VBox.vgrow="ALWAYS"
+                      onMouseClicked="#handleSessionClicked"/>
+
+            <Separator style="-fx-background-color: #2a2a5a;"/>
+
+            <VBox fx:id="notificationBanner" spacing="4" managed="false" visible="false"/>
+        </VBox>
+    </left>
+
+    <!-- ── Center: active session chat ──────────────────────────────── -->
+    <center>
+        <VBox spacing="8" style="-fx-background-color: #1a1a2e;">
+            <padding><Insets top="12" bottom="12" left="12" right="12"/></padding>
+
+            <HBox alignment="CENTER_LEFT" spacing="8">
+                <Label fx:id="activeSessionLabel"
+                       text="No session selected"
+                       style="-fx-text-fill: #aaaacc; -fx-font-weight: bold;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="pendingOrdersLabel"
+                       styleClass="status-badge-waiting"/>
+                <Button text="Send to Kitchen"
+                        onAction="#handleSendToKitchen"
+                        styleClass="primary-btn"
+                        style="-fx-padding: 4 12;"/>
+                <Button text="End Session"
+                        onAction="#handleEndSession"
+                        styleClass="danger-btn"
+                        style="-fx-padding: 4 12;"/>
+            </HBox>
+
+            <TextArea fx:id="chatArea"
+                      styleClass="chat-area"
+                      editable="false"
+                      wrapText="true"
+                      VBox.vgrow="ALWAYS"/>
+
+            <HBox spacing="8">
+                <TextField fx:id="messageInput"
+                           styleClass="chat-field"
+                           promptText="Reply to customer..."
+                           HBox.hgrow="ALWAYS"
+                           onAction="#handleSend"/>
+                <Button text="Send ➤"
+                        onAction="#handleSend"
+                        styleClass="primary-btn"
+                        style="-fx-padding: 8 16;"/>
+            </HBox>
+        </VBox>
+    </center>
+
+    <!-- ── Right: pending orders + photos for active session ───────── -->
+    <right>
+        <VBox styleClass="sidebar" spacing="10" prefWidth="300">
+            <padding><Insets top="14" bottom="14" left="14" right="14"/></padding>
+
+            <Label text="Pending Orders" styleClass="sidebar-title"/>
+            <TableView fx:id="pendingOrdersTable" VBox.vgrow="ALWAYS">
+                <columns>
+                    <TableColumn fx:id="ordIdCol"     text="Order #" prefWidth="80"/>
+                    <TableColumn fx:id="ordCoffeeCol" text="Coffee"  prefWidth="140"/>
+                    <TableColumn fx:id="ordTotalCol"  text="Total"  prefWidth="70"/>
+                </columns>
+                <placeholder>
+                    <Label text="No pending orders" style="-fx-text-fill: #555577;"/>
+                </placeholder>
+            </TableView>
+
+            <Separator style="-fx-background-color: #2a2a5a;"/>
+
+            <Label text="Session Photos" styleClass="sidebar-title"/>
+            <ListView fx:id="sessionImagesView" styleClass="image-list" prefHeight="160"/>
+        </VBox>
+    </right>
+
+</BorderPane>

@@ -135,4 +135,23 @@ public class BaristaQueue {
         try { return readyBaristas.size(); }
         finally { lock.unlock(); }
     }
+
+    /**
+     * Restores a previously ACTIVE session's barista assignment into the
+     * live queue state after an application restart, without going through
+     * the normal matching flow. The barista is marked as occupied by this
+     * session — they will NOT be handed a new match until this session ends.
+     *
+     * @param sessionId  the ACTIVE session being restored
+     * @param baristaId the barista this session was assigned to
+     */
+    public void restoreActiveAssignment(long sessionId, long baristaId) {
+        lock.lock();
+        try {
+            activeAssignments.put(sessionId, baristaId);
+            // Deliberately NOT added to readyBaristas — they are busy
+        } finally {
+            lock.unlock();
+        }
+    }
 }

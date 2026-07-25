@@ -1,14 +1,255 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import java.lang.*?>
-<?import java.util.*?>
-<?import javafx.scene.*?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
 
-<AnchorPane xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="CustomerController"
-            prefHeight="400.0" prefWidth="600.0">
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="dev.saberlabs.fx.controllers.CustomerController"
+            style="-fx-background-color: #1a1a2e;"
+            prefWidth="900" prefHeight="640">
 
-</AnchorPane>
+    <!-- ── Top bar ──────────────────────────────────────────────────── -->
+    <top>
+        <HBox style="-fx-background-color: #16213e; -fx-border-color: #2a2a5a;
+                     -fx-border-width: 0 0 1 0;"
+              alignment="CENTER_LEFT" spacing="12">
+            <padding><Insets top="12" bottom="12" left="16" right="16"/></padding>
+            <Label text="☕" style="-fx-font-size: 20px;"/>
+            <Label text="Coffee Chat" style="-fx-text-fill: #e2b96f;
+                   -fx-font-weight: bold; -fx-font-size: 15px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="usernameLabel"
+                   style="-fx-text-fill: #8888aa; -fx-font-size: 12px;"/>
+            <Label fx:id="tierLabel"
+                   style="-fx-text-fill: #44cc88; -fx-font-size: 11px;
+                          -fx-background-color: #1a3a2a; -fx-padding: 2 8;
+                          -fx-background-radius: 4;"/>
+            <Button text="Logout" onAction="#handleLogout" styleClass="danger-btn"/>
+        </HBox>
+    </top>
+
+    <!-- ── Center: main content ─────────────────────────────────────── -->
+    <center>
+        <TabPane fx:id="tabPane"
+                 style="-fx-background-color: #1a1a2e;
+                        -fx-tab-min-width: 120px;">
+
+            <!-- ── Tab 1: Chat ──────────────────────────────────────── -->
+            <Tab text="💬 Chat" closable="false">
+                <BorderPane style="-fx-background-color: #1a1a2e;">
+
+                    <!-- Notification banner -->
+                    <top>
+                        <VBox fx:id="notificationBanner" spacing="4"
+                              style="-fx-background-color: #1a1a2e;"
+                              managed="false" visible="false">
+                            <padding>
+                                <Insets top="8" bottom="4" left="12" right="12"/>
+                            </padding>
+                        </VBox>
+                    </top>
+
+                    <!-- Chat area -->
+                    <center>
+                        <VBox spacing="8">
+                            <padding>
+                                <Insets top="12" bottom="8" left="12" right="12"/>
+                            </padding>
+
+                            <!-- Session status bar -->
+                            <HBox alignment="CENTER_LEFT" spacing="8">
+                                <Label text="Session:" styleClass="field-label"/>
+                                <Label fx:id="sessionStatusLabel"
+                                       styleClass="status-badge-waiting"
+                                       text="No active session"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Button fx:id="startChatBtn"
+                                        text="Start Chat"
+                                        onAction="#handleStartChat"
+                                        styleClass="primary-btn"
+                                        style="-fx-padding: 4 12;"/>
+                                <Button fx:id="endChatBtn"
+                                        text="End Session"
+                                        onAction="#handleEndSession"
+                                        styleClass="danger-btn"
+                                        style="-fx-padding: 4 12;"
+                                        visible="false" managed="false"/>
+                            </HBox>
+
+                            <!-- Messages display -->
+                            <TextArea fx:id="chatArea"
+                                      styleClass="chat-area"
+                                      editable="false"
+                                      wrapText="true"
+                                      VBox.vgrow="ALWAYS"
+                                      prefHeight="360"/>
+
+                            <!-- Input row -->
+                            <HBox spacing="8" alignment="CENTER">
+                                <TextField fx:id="messageInput"
+                                           styleClass="chat-field"
+                                           promptText="Type a message or: order espresso milk"
+                                           HBox.hgrow="ALWAYS"
+                                           onAction="#handleSend"/>
+                                <Button text="Send ➤"
+                                        onAction="#handleSend"
+                                        styleClass="primary-btn"
+                                        style="-fx-padding: 8 16;"/>
+                                <Button text="📎 Upload"
+                                        onAction="#handleUploadImage"
+                                        styleClass="secondary-btn"
+                                        style="-fx-padding: 8 12;"/>
+                            </HBox>
+                        </VBox>
+                    </center>
+                </BorderPane>
+            </Tab>
+
+            <!-- ── Tab 2: Pay ──────────────────────────────────────── -->
+            <Tab text="💳 Pay" closable="false">
+                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
+
+                    <Label text="Orders Ready for Payment"
+                           style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
+                                  -fx-font-size: 14px;"/>
+
+                    <TableView fx:id="readyOrdersTable"
+                               styleClass="image-list"
+                               VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="payOrderIdCol"    text="Order #"  prefWidth="100"/>
+                            <TableColumn fx:id="payCoffeeCol"     text="Coffee"   prefWidth="220"/>
+                            <TableColumn fx:id="payTotalCol"      text="Total"    prefWidth="80"/>
+                            <TableColumn fx:id="payStatusCol"     text="Status"   prefWidth="100"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No orders ready for payment"
+                                   style="-fx-text-fill: #555577;"/>
+                        </placeholder>
+                    </TableView>
+
+                    <HBox spacing="12" alignment="CENTER_LEFT">
+                        <Label text="Payment method:" styleClass="field-label"/>
+                        <ComboBox fx:id="paymentMethodCombo"
+                                  promptText="Select..."
+                                  style="-fx-background-color: #0f3460;
+                                         -fx-text-fill: #e0e0f0;"/>
+                        <Button text="Pay Selected Order"
+                                onAction="#handlePaySelectedOrder"
+                                styleClass="primary-btn"
+                                style="-fx-padding: 8 20;"/>
+                        <Button text="🔄 Refresh"
+                                onAction="#refreshReadyOrders"
+                                styleClass="secondary-btn"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+
+            <!-- ── Tab 3: Order History ─────────────────────────────── -->
+            <Tab text="📋 History" closable="false">
+                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
+
+                    <HBox alignment="CENTER_LEFT" spacing="12">
+                        <Label text="My Orders"
+                               style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
+                                      -fx-font-size: 14px;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <Label fx:id="loyaltyLabel"
+                               style="-fx-text-fill: #aaaacc; -fx-font-size: 12px;"/>
+                    </HBox>
+
+                    <TableView fx:id="orderHistoryTable"
+                               styleClass="image-list"
+                               VBox.vgrow="ALWAYS">
+                        <columns>
+                            <TableColumn fx:id="histOrderIdCol"  text="Order #" prefWidth="100"/>
+                            <TableColumn fx:id="histCoffeeCol"   text="Coffee"  prefWidth="220"/>
+                            <TableColumn fx:id="histTotalCol"    text="Total"   prefWidth="80"/>
+                            <TableColumn fx:id="histStatusCol"   text="Status"  prefWidth="100"/>
+                            <TableColumn fx:id="histDateCol"     text="Date"    prefWidth="120"/>
+                        </columns>
+                        <placeholder>
+                            <Label text="No orders yet"
+                                   style="-fx-text-fill: #555577;"/>
+                        </placeholder>
+                    </TableView>
+                </VBox>
+            </Tab>
+
+            <!-- ── Tab 4: Uploads ───────────────────────────────────── -->
+            <Tab text="🖼 Photos" closable="false">
+                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
+                    <Label text="Uploaded Photos"
+                           style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
+                                  -fx-font-size: 14px;"/>
+                    <ListView fx:id="imageListView"
+                              styleClass="image-list"
+                              VBox.vgrow="ALWAYS"/>
+                    <HBox spacing="8">
+                        <Button text="📎 Upload Photo"
+                                onAction="#handleUploadImage"
+                                styleClass="primary-btn"
+                                style="-fx-padding: 8 20;"/>
+                    </HBox>
+                </VBox>
+            </Tab>
+
+            <!-- ── Tab 5: My Info ───────────────────────────────────── -->
+            <Tab text="👤 Profile" closable="false">
+                <VBox spacing="16" style="-fx-background-color: #1a1a2e;">
+                    <padding><Insets top="24" bottom="24" left="32" right="32"/></padding>
+                    <Label text="My Profile"
+                           style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
+                                  -fx-font-size: 16px;"/>
+
+                    <GridPane hgap="16" vgap="12">
+                        <Label text="Username:" styleClass="field-label"
+                               GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                        <Label fx:id="profileUsername"
+                               style="-fx-text-fill: #e0e0f0;"
+                               GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+
+                        <Label text="Loyalty Tier:" styleClass="field-label"
+                               GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+                        <Label fx:id="profileTier"
+                               style="-fx-text-fill: #44cc88; -fx-font-weight: bold;"
+                               GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+
+                        <Label text="Total Orders:" styleClass="field-label"
+                               GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+                        <Label fx:id="profileOrders"
+                               style="-fx-text-fill: #e0e0f0;"
+                               GridPane.columnIndex="1" GridPane.rowIndex="2"/>
+                    </GridPane>
+
+                    <Separator style="-fx-background-color: #2a2a5a;"/>
+
+                    <Label text="Change Password"
+                           style="-fx-text-fill: #aaaacc; -fx-font-weight: bold;"/>
+                    <Label text="Current password" styleClass="field-label"/>
+                    <PasswordField fx:id="currentPassField" styleClass="chat-field"
+                                   promptText="Enter current password"
+                                   maxWidth="320"/>
+                    <Label text="New password" styleClass="field-label"/>
+                    <PasswordField fx:id="newPassField" styleClass="chat-field"
+                                   promptText="At least 6 characters"
+                                   maxWidth="320"/>
+                    <Label fx:id="passChangeError" styleClass="error-label"/>
+                    <Button text="Update Password"
+                            onAction="#handleChangePassword"
+                            styleClass="primary-btn"
+                            maxWidth="320"/>
+                </VBox>
+            </Tab>
+
+        </TabPane>
+    </center>
+
+</BorderPane>

@@ -29,6 +29,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -75,6 +76,7 @@ public class BaristaController
     private User               user;
     private ChatSession        activeSession;
     private List<ChatSession>  displayedSessions = List.of();
+    private Stage ownerStage;
 
     // ================================================================
     // Table setup — no dependency on `user`, safe in initialize()
@@ -123,6 +125,12 @@ public class BaristaController
         refreshDashboard();
         updateQueueLabel();
     }
+
+    @Override
+    public void setOwnerStage(@NotNull Stage stage) {
+        this.ownerStage = stage;
+    }
+
 
     // ================================================================
     // Sidebar — session list
@@ -224,7 +232,7 @@ public class BaristaController
         chatService.baristaOffline(user);
         chatService.removeObserver(this);
         notificationService.removeObserver(this);
-        SceneRouter.navigateToLogin();
+        SceneRouter.navigateToLogin(ownerStage);
     }
 
     // ================================================================

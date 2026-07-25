@@ -7,12 +7,12 @@
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="dev.saberlabs.fx.controllers.ManagerController"
-            style="-fx-background-color: #1a1a2e;"
+            style="-fx-background-color: #2b1d16;"
             prefWidth="1000" prefHeight="640">
 
     <!-- ── Top bar ──────────────────────────────────────────────────── -->
     <top>
-        <HBox style="-fx-background-color: #16213e; -fx-border-color: #2a2a5a;
+        <HBox style="-fx-background-color: #3c2a21; -fx-border-color: #2a2a5a;
                      -fx-border-width: 0 0 1 0;"
               alignment="CENTER_LEFT" spacing="12">
             <padding><Insets top="12" bottom="12" left="16" right="16"/></padding>
@@ -31,7 +31,7 @@
 
             <!-- ── Tab 1: Users ─────────────────────────────────────── -->
             <Tab text="👥 Users" closable="false">
-                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
 
                     <HBox spacing="10" alignment="CENTER_LEFT">
@@ -71,7 +71,7 @@
 
             <!-- ── Tab 2: Sessions ──────────────────────────────────── -->
             <Tab text="💬 Sessions" closable="false">
-                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
 
                     <HBox alignment="CENTER_LEFT" spacing="10">
@@ -109,7 +109,7 @@
 
             <!-- ── Tab 3: All Messages ──────────────────────────────── -->
             <Tab text="📜 All Messages" closable="false">
-                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
                     <HBox alignment="CENTER_LEFT" spacing="10">
                         <Label text="Global Audit Log"
@@ -130,7 +130,7 @@
 
             <!-- ── Tab 4: Orders ────────────────────────────────────── -->
             <Tab text="🧾 Orders" closable="false">
-                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
                     <HBox alignment="CENTER_LEFT" spacing="10">
                         <Label text="All Orders"

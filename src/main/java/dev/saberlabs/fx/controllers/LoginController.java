@@ -11,13 +11,9 @@ import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import org.jetbrains.annotations.NotNull;
 
-/**
- * Controller for login.fxml.
- *
- * Handles login and registration, then routes to the correct
- * role-based view via {@link SceneRouter}.
- */
 public class LoginController {
 
     // ── Login form ────────────────────────────────────────────────────
@@ -37,8 +33,24 @@ public class LoginController {
     private final AuthService authService =
             AppContext.getInstance().getAuthService();
 
+    /** The specific window this login screen belongs to — set explicitly. */
+    private Stage ownerStage;
+
+    /**
+     * Sets which Stage this login screen belongs to. Must be called
+     * before any login/register action fires, so navigation happens
+     * on the correct window rather than a shared static one.
+     *
+     * Called by CoffeeChatFX.start() for the primary window, and by
+     * SceneRouter.openNewLoginWindow()/navigateToLogin() for any
+     * additional windows.
+     */
+    public void setOwnerStage(@NotNull Stage stage) {
+        this.ownerStage = stage;
+    }
+
     // ================================================================
-    // Tab switching
+    // Tab switching — unchanged
     // ================================================================
 
     @FXML
@@ -114,16 +126,16 @@ public class LoginController {
     }
 
     // ================================================================
-    // Role-based routing
+    // Role-based routing — now navigates THIS window's stage only
     // ================================================================
 
-    private void routeByRole(User user) {
+    private void routeByRole(@NotNull User user) {
         switch (user.role()) {
-            case CUSTOMER -> SceneRouter.navigateTo("/fxml/customer.fxml",
+            case CUSTOMER -> SceneRouter.navigateTo(ownerStage, "/fxml/customer.fxml",
                     "☕ Coffee Chat — " + user.username(), user);
-            case BARISTA  -> SceneRouter.navigateTo("/fxml/barista.fxml",
+            case BARISTA  -> SceneRouter.navigateTo(ownerStage, "/fxml/barista.fxml",
                     "☕ Barista Dashboard — " + user.username(), user);
-            case MANAGER  -> SceneRouter.navigateTo("/fxml/manager.fxml",
+            case MANAGER  -> SceneRouter.navigateTo(ownerStage, "/fxml/manager.fxml",
                     "☕ Manager — " + user.username(), user);
         }
     }

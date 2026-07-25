@@ -5,10 +5,10 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
-<VBox alignment="CENTER" spacing="0" style="-fx-background-color: #1a1a2e;" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="dev.saberlabs.fx.controllers.LoginController">
+<VBox alignment="CENTER" spacing="0" style="-fx-background-color: #2b1d16;" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="dev.saberlabs.fx.controllers.LoginController">
 
     <!-- Header -->
-    <VBox alignment="CENTER" spacing="4" style="-fx-background-color: #16213e;">
+    <VBox alignment="CENTER" spacing="4" style="-fx-background-color: #3c2a21;">
         <padding><Insets bottom="32" left="40" right="40" top="32" /></padding>
         <Label style="-fx-font-size: 40px;" text="☕" textFill="#795702">
          <font>
@@ -19,7 +19,7 @@
     </VBox>
 
     <!-- Tab bar -->
-    <HBox spacing="0" style="-fx-background-color: #0f3460;">
+    <HBox spacing="0" style="-fx-background-color: #4a342a;">
         <Button fx:id="loginTabBtn" maxWidth="Infinity" onAction="#switchToLogin" styleClass="tab-btn-active" text="Login" HBox.hgrow="ALWAYS" />
         <Button fx:id="registerTabBtn" maxWidth="Infinity" onAction="#switchToRegister" styleClass="tab-btn" text="Register" HBox.hgrow="ALWAYS" />
     </HBox>

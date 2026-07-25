@@ -17,6 +17,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -66,6 +67,7 @@ public class ManagerController implements SessionAware {
     private final AppContext ctx = AppContext.getInstance();
 
     private User manager;
+    private Stage ownerStage;
 
     // ================================================================
     // Table setup — no dependency on `user`, safe in initialize()
@@ -117,7 +119,7 @@ public class ManagerController implements SessionAware {
     }
 
     // ================================================================
-    // SessionAware — replaces the old user-dependent initialize() logic
+    // SessionAware
     // ================================================================
 
     @Override
@@ -129,6 +131,11 @@ public class ManagerController implements SessionAware {
         refreshSessions();
         refreshAllMessages();
         refreshOrders();
+    }
+
+    @Override
+    public void setOwnerStage(@NotNull Stage stage) {
+        this.ownerStage = stage;
     }
 
     // ================================================================
@@ -223,7 +230,7 @@ public class ManagerController implements SessionAware {
 
     @FXML
     private void handleLogout() {
-        SceneRouter.navigateToLogin();
+        SceneRouter.navigateToLogin(ownerStage);
     }
 
     // ================================================================

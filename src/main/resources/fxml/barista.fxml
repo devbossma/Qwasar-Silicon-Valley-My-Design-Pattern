@@ -7,12 +7,12 @@
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="dev.saberlabs.fx.controllers.BaristaController"
-            style="-fx-background-color: #1a1a2e;"
+            style="-fx-background-color: #2b1d16;"
             prefWidth="1100" prefHeight="680">
 
     <!-- ── Top bar ──────────────────────────────────────────────────── -->
     <top>
-        <HBox style="-fx-background-color: #16213e; -fx-border-color: #2a2a5a;
+        <HBox style="-fx-background-color: #3c2a21; -fx-border-color: #2a2a5a;
                      -fx-border-width: 0 0 1 0;"
               alignment="CENTER_LEFT" spacing="12">
             <padding><Insets top="12" bottom="12" left="16" right="16"/></padding>
@@ -55,7 +55,7 @@
 
     <!-- ── Center: active session chat ──────────────────────────────── -->
     <center>
-        <VBox spacing="8" style="-fx-background-color: #1a1a2e;">
+        <VBox spacing="8" style="-fx-background-color: #2b1d16;">
             <padding><Insets top="12" bottom="12" left="12" right="12"/></padding>
 
             <HBox alignment="CENTER_LEFT" spacing="8">

@@ -9,12 +9,12 @@
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="dev.saberlabs.fx.controllers.CustomerController"
-            style="-fx-background-color: #1a1a2e;"
+            style="-fx-background-color: #2b1d16;"
             prefWidth="900" prefHeight="640">
 
     <!-- ── Top bar ──────────────────────────────────────────────────── -->
     <top>
-        <HBox style="-fx-background-color: #16213e; -fx-border-color: #2a2a5a;
+        <HBox style="-fx-background-color: #3c2a21; -fx-border-color: #2a2a5a;
                      -fx-border-width: 0 0 1 0;"
               alignment="CENTER_LEFT" spacing="12">
             <padding><Insets top="12" bottom="12" left="16" right="16"/></padding>
@@ -40,12 +40,12 @@
 
             <!-- ── Tab 1: Chat ──────────────────────────────────────── -->
             <Tab text="💬 Chat" closable="false">
-                <BorderPane style="-fx-background-color: #1a1a2e;">
+                <BorderPane style="-fx-background-color: #2b1d16;">
 
                     <!-- Notification banner -->
                     <top>
                         <VBox fx:id="notificationBanner" spacing="4"
-                              style="-fx-background-color: #1a1a2e;"
+                              style="-fx-background-color: #2b1d16;"
                               managed="false" visible="false">
                             <padding>
                                 <Insets top="8" bottom="4" left="12" right="12"/>
@@ -111,7 +111,7 @@
 
             <!-- ── Tab 2: Pay ──────────────────────────────────────── -->
             <Tab text="💳 Pay" closable="false">
-                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
 
                     <Label text="Orders Ready for Payment"
@@ -152,7 +152,7 @@
 
             <!-- ── Tab 3: Order History ─────────────────────────────── -->
             <Tab text="📋 History" closable="false">
-                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
 
                     <HBox alignment="CENTER_LEFT" spacing="12">
@@ -184,7 +184,7 @@
 
             <!-- ── Tab 4: Uploads ───────────────────────────────────── -->
             <Tab text="🖼 Photos" closable="false">
-                <VBox spacing="12" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
                     <Label text="Uploaded Photos"
                            style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
@@ -203,7 +203,7 @@
 
             <!-- ── Tab 5: My Info ───────────────────────────────────── -->
             <Tab text="👤 Profile" closable="false">
-                <VBox spacing="16" style="-fx-background-color: #1a1a2e;">
+                <VBox spacing="16" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="24" bottom="24" left="32" right="32"/></padding>
                     <Label text="My Profile"
                            style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;

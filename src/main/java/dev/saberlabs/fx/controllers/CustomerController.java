@@ -42,6 +42,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -114,6 +115,7 @@ public class CustomerController
     private User         user;
     private Customer     customer;
     private ChatSession  activeSession;
+    private Stage ownerStage;
 
     // ================================================================
     // Initializable
@@ -304,7 +306,7 @@ public class CustomerController
         }
         chatService.removeObserver(this);
         notificationService.removeObserver(this);
-        SceneRouter.navigateToLogin();
+        SceneRouter.navigateToLogin(ownerStage);
     }
 
     // ================================================================
@@ -544,5 +546,10 @@ public class CustomerController
         loadOrderHistory();
         loadImages();
         resumeExistingSessionIfAny();
+    }
+
+    @Override
+    public void setOwnerStage(@NotNull Stage stage) {
+        this.ownerStage = stage;
     }
 }

@@ -19,27 +19,16 @@ import dev.saberlabs.chat.ImageUpload;
 import dev.saberlabs.chat.MessageType;
 import dev.saberlabs.chat.NotificationObserver;
 import dev.saberlabs.chat.repositories.ChatImageRepository;
-import dev.saberlabs.fx.AppContext;
-import dev.saberlabs.fx.SceneRouter;
-import dev.saberlabs.fx.SessionAware;
+import dev.saberlabs.fx.*;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.order.StoredOrder;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
-import javafx.scene.control.PasswordField;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -49,9 +38,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.util.List;
-import java.util.Optional;
-import java.util.ResourceBundle;
+import java.util.*;
 
 /**
  * Controller for customer.fxml.
@@ -74,7 +61,7 @@ public class CustomerController
     @FXML private Label sessionStatusLabel;
     @FXML private javafx.scene.control.Button startChatBtn;
     @FXML private javafx.scene.control.Button endChatBtn;
-    @FXML private TextArea chatArea;
+    @FXML private ListView<ChatMessage> chatListView;
     @FXML private TextField messageInput;
 
     // ── Pay tab ───────────────────────────────────────────────────────
@@ -104,6 +91,7 @@ public class CustomerController
     @FXML private PasswordField currentPassField;
     @FXML private PasswordField newPassField;
     @FXML private Label         passChangeError;
+    @FXML private Button emojiBtn;
 
     // ── Services ─────────────────────────────────────────────────────
     private final AppContext              ctx                 = AppContext.getInstance();
@@ -116,6 +104,8 @@ public class CustomerController
     private Customer     customer;
     private ChatSession  activeSession;
     private Stage ownerStage;
+    private final ObservableList<ChatMessage> chatMessages = FXCollections.observableArrayList();
+    private final Map<String, ImageUpload> imageCache = new HashMap<>();
 
     // ================================================================
     // Initializable
@@ -160,6 +150,11 @@ public class CustomerController
     }
 
     @FXML
+    private void handleEmojiPicker() {
+        EmojiPicker.show(emojiBtn, messageInput);
+    }
+
+    @FXML
     private void handleEndSession() {
         if (activeSession == null) return;
         chatService.sendMessage(activeSession.id(), 0, "System",
@@ -168,7 +163,7 @@ public class CustomerController
         chatService.endSession(activeSession.id());
         activeSession = null;
         updateSessionStatus();
-        chatArea.appendText("\n─── Session ended ───\n");
+        chatMessages.clear();
     }
 
     @FXML
@@ -177,7 +172,7 @@ public class CustomerController
         if (text.isEmpty()) return;
 
         if (activeSession == null) {
-            appendToChat("⚠ Start a chat session first.\n");
+            showAlert("No session", "Start a chat session first.");
             return;
         }
 
@@ -197,10 +192,8 @@ public class CustomerController
         chooser.getExtensionFilters().addAll(
                 new FileChooser.ExtensionFilter("Images",
                         "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"));
-
-        File file = chooser.showOpenDialog(chatArea.getScene().getWindow());
+        File file = chooser.showOpenDialog(chatListView.getScene().getWindow());
         if (file == null) return;
-
         try {
             byte[] data = Files.readAllBytes(file.toPath());
             ImageUpload upload = ImageUpload.of(
@@ -315,12 +308,12 @@ public class CustomerController
 
     @Override
     public void onMessageReceived(@NotNull ChatMessage message) {
-        if (activeSession == null
-                || message.sessionId() != activeSession.id()) return;
-        if (message.senderId() == user.id()) return;
+        if (activeSession == null || message.sessionId() != activeSession.id()) return;
 
-        Platform.runLater(() ->
-                appendToChat(message.toString() + "\n"));
+        Platform.runLater(() -> {
+            chatMessages.add(message);
+            scrollToBottom();
+        });
     }
 
     // ================================================================
@@ -376,9 +369,8 @@ public class CustomerController
 
     private void loadChatHistory() {
         if (activeSession == null) return;
-        chatArea.clear();
-        chatService.loadHistory(activeSession.id())
-                .forEach(m -> appendToChat(m.toString() + "\n"));
+        chatMessages.setAll(chatService.loadHistory(activeSession.id()));
+        scrollToBottom();
     }
 
     private void loadOrderHistory() {
@@ -444,8 +436,8 @@ public class CustomerController
     }
 
     private void appendToChat(String text) {
-        chatArea.appendText(text);
-        chatArea.setScrollTop(Double.MAX_VALUE);
+        chatMessages.add(ChatMessage.of(MessageType.CHAT_MESSAGE, activeSession.id(), activeSession.customerId(), user.username(), text, null));
+        scrollToBottom();
     }
 
     private @NotNull String descriptionOf(@NotNull StoredOrder o) {
@@ -542,6 +534,11 @@ public class CustomerController
         loyaltyLabel.setText(customer.getLoyaltyTier().name()
                 + " — " + customer.getTotalOrders() + " orders");
 
+        chatListView.setItems(chatMessages);
+        chatListView.setCellFactory(list -> new ChatBubbleCell(user.id(), this::resolveImageForMessage));
+        chatListView.setStyle("-fx-background-color: transparent;");
+        chatListView.setFixedCellSize(-1);
+
         showUnreadNotifications();
         loadOrderHistory();
         loadImages();
@@ -551,5 +548,24 @@ public class CustomerController
     @Override
     public void setOwnerStage(@NotNull Stage stage) {
         this.ownerStage = stage;
+    }
+
+    private ImageUpload resolveImageForMessage(@NotNull ChatMessage message) {
+        if (!message.content().startsWith("📎 Shared a photo")) return null;
+        // Simple approach: look up the most recent image in this session
+        // uploaded by this sender around this message's timestamp.
+        return imageCache.computeIfAbsent(
+                message.sessionId() + ":" + message.senderId() + ":" + message.timestamp(),
+                k -> imageRepository.findBySessionId(message.sessionId()).stream()
+                        .filter(img -> img.senderId() == message.senderId())
+                        .filter(img -> !img.timestamp().isAfter(message.timestamp()))
+                        .max(java.util.Comparator.comparing(ImageUpload::timestamp))
+                        .orElse(null));
+    }
+
+    private void scrollToBottom() {
+        if (!chatMessages.isEmpty()) {
+            chatListView.scrollTo(chatMessages.size() - 1);
+        }
     }
 }

@@ -380,3 +380,21 @@
 .scroll-bar .track {
     -fx-background-color: #2b1d16;
 }
+
+.chat-list {
+    -fx-background-color: #2b1d16;
+    -fx-control-inner-background: #2b1d16;
+    -fx-border-color: #6f4e37;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.chat-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.chat-list .list-cell:filled:selected,
+.chat-list .list-cell:filled:hover {
+    -fx-background-color: transparent;
+}

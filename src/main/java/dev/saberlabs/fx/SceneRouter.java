@@ -109,6 +109,7 @@ public final class SceneRouter {
             Object controller = loader.getController();
             if (controller instanceof SessionAware sessionAware) {
                 sessionAware.setSessionUser(sessionUser);
+                sessionAware.setOwnerStage(ownerStage);
             } else {
                 throw new IllegalStateException(
                         "Controller for " + fxmlPath + " must implement SessionAware");
@@ -116,7 +117,7 @@ public final class SceneRouter {
 
             Scene scene = new Scene(root);
             scene.getStylesheets().add(
-                    Objects.requireNonNull(SceneRouter.class.getResource("/css/style.css")).toExternalForm());
+                    SceneRouter.class.getResource("/css/style.css").toExternalForm());
             return scene;
 
         } catch (IOException e) {

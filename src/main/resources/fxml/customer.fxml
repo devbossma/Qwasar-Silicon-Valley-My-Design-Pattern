@@ -14,7 +14,7 @@
 
     <!-- ── Top bar ──────────────────────────────────────────────────── -->
     <top>
-        <HBox style="-fx-background-color: #3c2a21; -fx-border-color: #2a2a5a;
+        <HBox style="-fx-background-color: #3c2a21;F -fx-border-color: #2a2a5a;
                      -fx-border-width: 0 0 1 0;"
               alignment="CENTER_LEFT" spacing="12">
             <padding><Insets top="12" bottom="12" left="16" right="16"/></padding>
@@ -81,20 +81,22 @@
                             </HBox>
 
                             <!-- Messages display -->
-                            <TextArea fx:id="chatArea"
-                                      styleClass="chat-area"
-                                      editable="false"
-                                      wrapText="true"
+                            <ListView fx:id="chatListView"
                                       VBox.vgrow="ALWAYS"
-                                      prefHeight="360"/>
+                                      style="-fx-background-color: #2b1d16; -fx-border-color: #6f4e37;
+                                      -fx-border-radius: 6; -fx-background-radius: 6;"/>
 
                             <!-- Input row -->
                             <HBox spacing="8" alignment="CENTER">
                                 <TextField fx:id="messageInput"
                                            styleClass="chat-field"
-                                           promptText="Type a message or: order espresso milk"
+                                           promptText="Type a message..."
                                            HBox.hgrow="ALWAYS"
                                            onAction="#handleSend"/>
+                                <Button fx:id="emojiBtn" text="😊"
+                                        onAction="#handleEmojiPicker"
+                                        styleClass="secondary-btn"
+                                        style="-fx-padding: 8 12; -fx-font-size: 16px;"/>
                                 <Button text="Send ➤"
                                         onAction="#handleSend"
                                         styleClass="primary-btn"

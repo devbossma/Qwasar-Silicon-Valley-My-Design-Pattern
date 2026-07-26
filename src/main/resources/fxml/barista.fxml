@@ -75,11 +75,10 @@
                         style="-fx-padding: 4 12;"/>
             </HBox>
 
-            <TextArea fx:id="chatArea"
-                      styleClass="chat-area"
-                      editable="false"
-                      wrapText="true"
-                      VBox.vgrow="ALWAYS"/>
+            <ListView fx:id="chatListView"
+                      VBox.vgrow="ALWAYS"
+                      style="-fx-background-color: #2b1d16; -fx-border-color: #6f4e37;
+                      -fx-border-radius: 6; -fx-background-radius: 6;"/>
 
             <HBox spacing="8">
                 <TextField fx:id="messageInput"
@@ -87,6 +86,10 @@
                            promptText="Reply to customer..."
                            HBox.hgrow="ALWAYS"
                            onAction="#handleSend"/>
+                <Button fx:id="emojiBtn" text="😊"
+                        onAction="#handleEmojiPicker"
+                        styleClass="secondary-btn"
+                        style="-fx-padding: 8 12; -fx-font-size: 16px;"/>
                 <Button text="Send ➤"
                         onAction="#handleSend"
                         styleClass="primary-btn"

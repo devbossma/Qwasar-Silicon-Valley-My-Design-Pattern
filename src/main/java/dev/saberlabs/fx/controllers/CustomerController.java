@@ -27,7 +27,12 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
+import dev.saberlabs.fx.ChatBubbleCell;
+import javafx.collections.ObservableList;
+import javafx.scene.control.ListView;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Comparator;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
@@ -42,7 +47,7 @@ import java.util.*;
 
 /**
  * Controller for customer.fxml.
- *
+ * *
  * Implements both {@link dev.saberlabs.chat.ChatObserver} and
  * {@link NotificationObserver} — all UI updates from background
  * threads are wrapped in {@link Platform#runLater}.
@@ -116,26 +121,21 @@ public class CustomerController
         paymentMethodCombo.setItems(FXCollections.observableArrayList(
                 "Cash", "PayPal", "Credit Card (Stripe)"));
 
-        payOrderIdCol.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().id()));
-        payCoffeeCol.setCellValueFactory(c ->
-                new SimpleStringProperty(descriptionOf(c.getValue())));
-        payTotalCol.setCellValueFactory(c ->
-                new SimpleStringProperty(String.format("$%.2f", c.getValue().total())));
-        payStatusCol.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().status()));
+        payOrderIdCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().id()));
+        payCoffeeCol.setCellValueFactory(c -> new SimpleStringProperty(descriptionOf(c.getValue())));
+        payTotalCol.setCellValueFactory(c -> new SimpleStringProperty(String.format("$%.2f", c.getValue().total())));
+        payStatusCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().status()));
 
-        histOrderIdCol.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().id()));
-        histCoffeeCol.setCellValueFactory(c ->
-                new SimpleStringProperty(descriptionOf(c.getValue())));
-        histTotalCol.setCellValueFactory(c ->
-                new SimpleStringProperty(String.format("$%.2f", c.getValue().total())));
-        histStatusCol.setCellValueFactory(c ->
-                new SimpleStringProperty(c.getValue().status()));
+        histOrderIdCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().id()));
+        histCoffeeCol.setCellValueFactory(c -> new SimpleStringProperty(descriptionOf(c.getValue())));
+        histTotalCol.setCellValueFactory(c -> new SimpleStringProperty(String.format("$%.2f", c.getValue().total())));
+        histStatusCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().status()));
         histDateCol.setCellValueFactory(c ->
-                new SimpleStringProperty(
-                        c.getValue().createdAt().toLocalDate().toString()));
+                new SimpleStringProperty(c.getValue().createdAt().toLocalDate().toString()));
+
+        // Chat bubble list wiring.
+        chatListView.setStyle("-fx-background-color: transparent;");
+        chatListView.setItems(chatMessages);
     }
 
     // ================================================================
@@ -158,8 +158,7 @@ public class CustomerController
     private void handleEndSession() {
         if (activeSession == null) return;
         chatService.sendMessage(activeSession.id(), 0, "System",
-                user.username() + " has left the conversation.",
-                 null);
+                user.username() + " has left the conversation.");
         chatService.endSession(activeSession.id());
         activeSession = null;
         updateSessionStatus();
@@ -186,7 +185,6 @@ public class CustomerController
             showAlert("No session", "Please start a chat session before uploading.");
             return;
         }
-
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Upload Photo");
         chooser.getExtensionFilters().addAll(
@@ -200,13 +198,10 @@ public class CustomerController
                     activeSession.id(), user.id(), file.getName(), data);
             imageRepository.save(upload);
 
-            // Announce in the chat as a system message
             chatService.sendMessage(activeSession.id(), user.id(), user.username(),
-                    "📎 Shared a photo: " + file.getName(),
-                     null);
+                    "📎 Shared a photo: " + file.getName());
 
             loadImages();
-            appendToChat("📎 Photo uploaded: " + file.getName() + "\n");
 
         } catch (IOException e) {
             showAlert("Upload failed", e.getMessage());
@@ -335,11 +330,6 @@ public class CustomerController
             notificationBanner.setManaged(true);
             notificationBanner.getChildren().add(badge);
 
-            // Also append into the chat area if a session is open
-            if (activeSession != null) {
-                appendToChat(notification.toString() + "\n");
-            }
-
             // Refresh pay/history tabs if order status changed
             if (notification.type().name().contains("ORDER")) {
                 refreshReadyOrders();
@@ -354,10 +344,7 @@ public class CustomerController
     // ================================================================
 
     private void resumeExistingSessionIfAny() {
-        chatService.startChat(user); // no-op if session exists, returns it
-        // just check if there's already one
-        var existingOpt = ctx.getChatService()
-                .getAllSessions().stream()
+        var existingOpt = chatService.getAllSessions().stream()
                 .filter(s -> s.customerId() == user.id() && !s.isInactive())
                 .findFirst();
         existingOpt.ifPresent(s -> {
@@ -433,11 +420,6 @@ public class CustomerController
         tierLabel.setText(customer.getLoyaltyTier().name());
         loyaltyLabel.setText(customer.getLoyaltyTier().name()
                 + " — " + customer.getTotalOrders() + " orders");
-    }
-
-    private void appendToChat(String text) {
-        chatMessages.add(ChatMessage.of(MessageType.CHAT_MESSAGE, activeSession.id(), activeSession.customerId(), user.username(), text, null));
-        scrollToBottom();
     }
 
     private @NotNull String descriptionOf(@NotNull StoredOrder o) {
@@ -525,6 +507,9 @@ public class CustomerController
         chatService.registerObserver(this);
         notificationService.registerObserver(this);
 
+        chatListView.setCellFactory(list ->
+                new ChatBubbleCell(user.id(), this::resolveImageForMessage)); // ← ADD
+
         usernameLabel.setText(user.username());
         tierLabel.setText(customer.getLoyaltyTier().name());
 
@@ -533,11 +518,6 @@ public class CustomerController
         profileOrders.setText(String.valueOf(customer.getTotalOrders()));
         loyaltyLabel.setText(customer.getLoyaltyTier().name()
                 + " — " + customer.getTotalOrders() + " orders");
-
-        chatListView.setItems(chatMessages);
-        chatListView.setCellFactory(list -> new ChatBubbleCell(user.id(), this::resolveImageForMessage));
-        chatListView.setStyle("-fx-background-color: transparent;");
-        chatListView.setFixedCellSize(-1);
 
         showUnreadNotifications();
         loadOrderHistory();

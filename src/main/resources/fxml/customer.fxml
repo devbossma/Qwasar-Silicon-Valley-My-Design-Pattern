@@ -188,18 +188,29 @@
             <Tab text="🖼 Photos" closable="false">
                 <VBox spacing="12" style="-fx-background-color: #2b1d16;">
                     <padding><Insets top="16" bottom="16" left="16" right="16"/></padding>
-                    <Label text="Uploaded Photos"
-                           style="-fx-text-fill: #e2b96f; -fx-font-weight: bold;
-                                  -fx-font-size: 14px;"/>
-                    <ListView fx:id="imageListView"
-                              styleClass="image-list"
-                              VBox.vgrow="ALWAYS"/>
-                    <HBox spacing="8">
+
+                    <HBox alignment="CENTER_LEFT" spacing="10">
+                        <Label text="Uploaded Photos"
+                               style="-fx-text-fill: #d9a441; -fx-font-weight: bold;
+                          -fx-font-size: 14px;"/>
+                        <Region HBox.hgrow="ALWAYS"/>
                         <Button text="📎 Upload Photo"
                                 onAction="#handleUploadImage"
                                 styleClass="primary-btn"
-                                style="-fx-padding: 8 20;"/>
+                                style="-fx-padding: 6 16;"/>
                     </HBox>
+
+                    <ScrollPane fx:id="photoGalleryScroll"
+                                fitToWidth="true"
+                                VBox.vgrow="ALWAYS"
+                                style="-fx-background: #2b1d16; -fx-background-color: #2b1d16;
+                           -fx-border-color: #6f4e37; -fx-border-radius: 6;">
+                        <FlowPane fx:id="photoGallery"
+                                  hgap="12" vgap="12"
+                                  style="-fx-background-color: #2b1d16;">
+                            <padding><Insets top="12" bottom="12" left="12" right="12"/></padding>
+                        </FlowPane>
+                    </ScrollPane>
                 </VBox>
             </Tab>
 

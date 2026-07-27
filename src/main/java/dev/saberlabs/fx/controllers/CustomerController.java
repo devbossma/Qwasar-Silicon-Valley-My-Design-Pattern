@@ -29,11 +29,18 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import dev.saberlabs.fx.ChatBubbleCell;
 import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.ListView;
+
+import java.io.ByteArrayInputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Comparator;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -87,7 +94,7 @@ public class CustomerController
     @FXML private Label loyaltyLabel;
 
     // ── Photos tab ────────────────────────────────────────────────────
-    @FXML private ListView<String> imageListView;
+    @FXML private FlowPane photoGallery;
 
     // ── Profile tab ───────────────────────────────────────────────────
     @FXML private Label         profileUsername;
@@ -308,7 +315,11 @@ public class CustomerController
         Platform.runLater(() -> {
             chatMessages.add(message);
             scrollToBottom();
+            if (message.content().startsWith("📎 Shared a photo")) {
+                loadImages(); // keeping the gallery tab in sync automatically
+            }
         });
+
     }
 
     // ================================================================
@@ -367,9 +378,67 @@ public class CustomerController
     }
 
     private void loadImages() {
+        photoGallery.getChildren().clear();
         List<ImageUpload> images = imageRepository.findBySenderId(user.id());
-        imageListView.setItems(FXCollections.observableArrayList(
-                images.stream().map(ImageUpload::toString).toList()));
+
+        if (images.isEmpty()) {
+            Label empty = new Label("No photos uploaded yet.");
+            empty.setStyle("-fx-text-fill: #8a7768; -fx-font-size: 12px;");
+            photoGallery.getChildren().add(empty);
+            return;
+        }
+
+        for (ImageUpload image : images) {
+            photoGallery.getChildren().add(buildGalleryCard(image));
+        }
+    }
+
+    private @NotNull VBox buildGalleryCard(@NotNull ImageUpload image) {
+        ImageView thumbnail;
+        try {
+            thumbnail = new ImageView(new Image(
+                    new ByteArrayInputStream(image.data()), 160, 160, true, true));
+        } catch (Exception e) {
+            Label broken = new Label("🖼 (unreadable)");
+            broken.setStyle("-fx-text-fill: #8a7768; -fx-font-size: 11px;");
+            VBox fallback = new VBox(broken);
+            fallback.setAlignment(Pos.CENTER);
+            fallback.setPrefSize(160, 160);
+            fallback.setStyle("-fx-background-color: #4a342a; -fx-background-radius: 8;");
+            return wrapGalleryCard(fallback, image);
+        }
+
+        VBox imageContainer = new VBox(thumbnail);
+        imageContainer.setAlignment(Pos.CENTER);
+        imageContainer.setStyle(
+                "-fx-background-color: #2b1d16; -fx-background-radius: 8; "
+                        + "-fx-border-color: #6f4e37; -fx-border-radius: 8;");
+        imageContainer.setPadding(new Insets(4));
+
+        return wrapGalleryCard(imageContainer, image);
+    }
+
+    private @NotNull VBox wrapGalleryCard(@NotNull javafx.scene.Node imageNode,
+                                          @NotNull ImageUpload image) {
+        Label filename = new Label(image.filename());
+        filename.setStyle("-fx-text-fill: #e8dcc8; -fx-font-size: 11px; -fx-font-weight: bold;");
+        filename.setWrapText(true);
+        filename.setMaxWidth(160);
+
+        Label meta = new Label(String.format("%02d:%02d — %d KB",
+                image.timestamp().getHour(), image.timestamp().getMinute(),
+                image.data().length / 1024));
+        meta.setStyle("-fx-text-fill: #8a7768; -fx-font-size: 9px;");
+
+        VBox card = new VBox(6, imageNode, filename, meta);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(10));
+        card.setMaxWidth(180);
+        card.setStyle(
+                "-fx-background-color: #4a342a; -fx-background-radius: 10; "
+                        + "-fx-border-color: #6f4e37; -fx-border-radius: 10;");
+
+        return card;
     }
 
     private void showUnreadNotifications() {

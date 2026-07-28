@@ -82,6 +82,13 @@ public class ChatService {
         }
         return customerCache.computeIfAbsent(user.id(), id -> {
             Customer customer = new Customer("CUST-" + id, user.username());
+
+            int fulfilledCount = (int) orderRepository.findByCustomer(id).stream()
+                    .filter(o -> o.status().equals(OrderStatus.FULFILLED.name()))
+                    .count();
+
+            customer.restoreTotalOrders(fulfilledCount);
+
             coffeeShop.registerObserver(customer);
             return customer;
         });

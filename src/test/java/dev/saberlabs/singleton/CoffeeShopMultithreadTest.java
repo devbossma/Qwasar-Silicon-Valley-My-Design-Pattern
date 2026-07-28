@@ -291,11 +291,12 @@ class CoffeeShopMultithreadTest {
 
             shop.close();
 
-            long fulfilled = shop.getOrders().stream()
-                    .filter(o -> o.getStatus() == OrderStatus.FULFILLED)
+            long readyCount = shop.getOrders().stream()
+                    .filter(o -> o.getStatus() == OrderStatus.READY)
                     .count();
-            assertEquals(orderCount, fulfilled,
-                    "All orders should be FULFILLED after shop closes");
+            assertEquals(orderCount, readyCount,
+                    "All orders should be READY after baristas finish preparing " +
+                            "(FULFILLED now requires explicit payment, outside this test's scope)");
         }
 
         @Test
@@ -405,7 +406,7 @@ class CoffeeShopMultithreadTest {
             Customer alice = new Customer(shop.nextCustomerId(), "Alice");
             shop.registerObserver(alice);
 
-            // Alice places 11 orders — should reach GOLD
+            // Alice places 11 orders — should reach GOLD once all are fulfilled
             CustomerThread ct = new CustomerThread(
                     alice,
                     shop::enqueueOrder,
@@ -418,7 +419,7 @@ class CoffeeShopMultithreadTest {
             thread.start();
             thread.join(20000);
 
-            // Wait for all orders to be fulfilled
+            // Wait for all orders to reach READY (worker threads' job)
             OrderQueue queue = shop.getOrderQueue();
             if (queue != null) {
                 while (!queue.isEmpty()) {
@@ -427,10 +428,27 @@ class CoffeeShopMultithreadTest {
             }
             Thread.sleep(5000);
 
+            // Simulate the payment/fulfillment step that ChatService would
+            // normally perform — this test is scoped to the multithreading
+            // package, so we exercise Order.setStatus(FULFILLED) directly
+            // rather than going through the chat/payment layer.
+            List<Order> aliceOrders = shop.getOrders().stream()
+                    .filter(o -> o.getCustomer().equals(alice))
+                    .toList();
+
+            assertEquals(11, aliceOrders.size(),
+                    "Alice should have placed 11 orders total");
+
+            for (Order order : aliceOrders) {
+                assertEquals(OrderStatus.READY, order.getStatus(),
+                        "Order should be READY before simulated fulfillment: " + order.getOrderId());
+                order.setStatus(OrderStatus.FULFILLED);
+            }
+
             shop.close();
 
             assertEquals(11, alice.getTotalOrders(),
-                    "Alice should have 11 fulfilled orders");
+                    "Alice should have 11 fulfilled orders after simulated payment");
             assertEquals(dev.saberlabs.models.LoyaltyTier.GOLD,
                     alice.getLoyaltyTier(),
                     "Alice should have reached GOLD tier");

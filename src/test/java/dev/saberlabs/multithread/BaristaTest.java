@@ -79,7 +79,7 @@ class BaristaTest {
     // -----------------------------------------------------------------------
 
     @Test
-    @DisplayName("Barista processes one order and sets status to FULFILLED")
+    @DisplayName("Barista processes one order and sets status to READY")
     void processesOneOrder() throws InterruptedException {
 
         // Set up a queue and add one order
@@ -100,14 +100,13 @@ class BaristaTest {
         thread.interrupt();
         thread.join(2000);
 
-        assertEquals(OrderStatus.FULFILLED, order.getStatus());
+        assertEquals(OrderStatus.READY, order.getStatus());
         assertEquals(1, barista.getOrdersCompleted());
     }
 
     @Test
-    @DisplayName("Barista increments customer loyalty on FULFILLED")
-    void incrementsCustomerLoyalty() throws InterruptedException {
-        // Set up a queue and add one order for Alice
+    @DisplayName("Barista brings order to READY but does not increment loyalty (payment required)")
+    void baristaReachesReadyWithoutIncrementingLoyalty() throws InterruptedException {
         OrderQueue queue = new OrderQueue(5);
         Customer alice = new Customer("CUST-1", "Alice");
         CoffeeShop.getInstance().registerObserver(alice);
@@ -125,11 +124,13 @@ class BaristaTest {
         thread.interrupt();
         thread.join(2000);
 
-        assertEquals(1, alice.getTotalOrders());
+        // Worker thread's responsibility ends at READY
+        assertEquals(OrderStatus.READY, order.getStatus());
+        assertEquals(0, alice.getTotalOrders());
     }
 
     @Test
-    @DisplayName("Barista processes multiple orders sequentially")
+    @DisplayName("Barista processes multiple orders sequentially,bringing each to READY")
     void processesMultipleOrders() throws InterruptedException {
         OrderQueue queue = new OrderQueue(5);
         Order o1 = createOrder("CUST-1", "Alice");
@@ -151,9 +152,9 @@ class BaristaTest {
         thread.join(2000);
 
         assertEquals(3, barista.getOrdersCompleted());
-        assertEquals(OrderStatus.FULFILLED, o1.getStatus());
-        assertEquals(OrderStatus.FULFILLED, o2.getStatus());
-        assertEquals(OrderStatus.FULFILLED, o3.getStatus());
+        assertEquals(OrderStatus.READY, o1.getStatus());
+        assertEquals(OrderStatus.READY, o2.getStatus());
+        assertEquals(OrderStatus.READY, o3.getStatus());
     }
 
     // -----------------------------------------------------------------------

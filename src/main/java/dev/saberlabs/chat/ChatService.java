@@ -210,20 +210,22 @@ public class ChatService {
         return sendMessage(sessionId, senderId, senderName, content, null);
     }
 
-    public void processCustomerInput(@NotNull User user,
-                                     @NotNull ChatSession session,
-                                     @NotNull String input) {
+    public @NotNull ChatMessage processCustomerInput(@NotNull User user,
+                                                     @NotNull ChatSession session,
+                                                     @NotNull String input) {
         Objects.requireNonNull(user, "User cannot be null");
         Objects.requireNonNull(session, "Session cannot be null");
         Objects.requireNonNull(input, "Input cannot be null");
 
         String trimmed = input.trim();
         if (trimmed.toLowerCase(Locale.ROOT).startsWith(ORDER_COMMAND)) {
-            handleOrderCommand(user, session, trimmed);
-            return;
+
+            return handleOrderCommand(user, session, trimmed);
         }
-        sendMessage(session.id(), user.id(), user.username(), trimmed);
+        return sendMessage(session.id(), user.id(), user.username(), trimmed);
     }
+
+
 
     // ================================================================
     // Order command parsing — now persists a StoredOrder row
@@ -293,7 +295,9 @@ public class ChatService {
                 "Order placed! %s — $%.2f (Order #%s). Waiting for the barista to send it to the kitchen.",
                 coffee.getDescription(), order.getFinalPrice(), order.getOrderId());
 
-        return sendMessage(session.id(), 0, "System", confirmation, order.getOrderId());
+//        return sendMessage(session.id(), 0, "System", confirmation, order.getOrderId());
+        return ChatMessage.of(MessageType.SYSTEM_MESSAGE, session.id(), 0, "System",
+                confirmation, order.getOrderId());
     }
 
     /**

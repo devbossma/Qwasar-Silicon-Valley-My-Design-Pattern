@@ -382,6 +382,7 @@ class ChatServiceTest {
                     aliceUser, session, "order espresso");
 
             PaymentGateway gateway = buildCashGateway(10.00);
+            assertNotNull(placed.orderId());
             boolean result = chatService.collectPaymentAndFulfill(
                     session, placed.orderId(), gateway);
 

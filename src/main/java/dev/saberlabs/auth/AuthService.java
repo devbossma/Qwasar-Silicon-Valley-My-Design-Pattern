@@ -10,20 +10,19 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Objects;
 import dev.saberlabs.auth.repositories.UserRepository;
-import dev.saberlabs.auth.repositories.implementations.sqlite.SqliteUserRepository;
 
 /**
  * Handles user authentication and registration for the coffee shop chat application.
- *
+ * *
  * Responsibilities:
  * - Register new users (CUSTOMER only — BARISTA created by MANAGER)
  * - Login existing users with username/password verification
  * - Hash passwords using SHA-256 — never stored as plain text
  * - Seed the initial MANAGER account if no users exist
- *
+ * *
  * Password security:
  * SHA-256 is used for simplicity in this educational context.
- * In production, use BCrypt or Argon2 with a salt.
+ * In production, use Bcrypt or Argon2 with a salt.
  */
 public class AuthService {
 
@@ -44,7 +43,7 @@ public class AuthService {
     /**
      * Seeds the default manager account if no users exist in the database.
      * Called once at application startup via DatabaseUtil.initialize().
-     *
+     * *
      * Default credentials:
      *   username: manager
      *   password: manager123
@@ -59,7 +58,6 @@ public class AuthService {
                     LocalDateTime.now()
             );
             userRepository.save(manager);
-            System.out.println("[AuthService] Default manager account created.");
             System.out.printf("[AuthService] Username: %s | Password: %s%n",
                     MANAGER_DEFAULT_USERNAME, MANAGER_DEFAULT_PASSWORD);
         }
@@ -103,6 +101,13 @@ public class AuthService {
         Objects.requireNonNull(role, "Role cannot be null");
 
         // Validate username
+        if(username.isEmpty() || password.isEmpty()) {
+            throw new IllegalArgumentException("Username and password cannot be empty");
+        }
+
+        if(username.equals(MANAGER_DEFAULT_USERNAME)) {
+            throw new IllegalArgumentException("Invalid username");
+        }
         if (username.isBlank()) {
             throw new IllegalArgumentException("Username cannot be blank");
         }
@@ -163,7 +168,7 @@ public class AuthService {
                 .orElseThrow(() -> new AuthException(
                         "No account found for username: " + username));
 
-        if (!verifyPassword(password, user.passwordHash())) {
+        if (verifyPassword(password, user.passwordHash())) {
             throw new AuthException("Incorrect password for: " + username);
         }
 
@@ -259,7 +264,7 @@ public class AuthService {
                                   @NotNull String storedHash) {
         Objects.requireNonNull(plainPassword, "Password cannot be null");
         Objects.requireNonNull(storedHash, "Stored hash cannot be null");
-        return hashPassword(plainPassword).equals(storedHash);
+        return !hashPassword(plainPassword).equals(storedHash);
     }
 
     /**
@@ -274,7 +279,7 @@ public class AuthService {
     public void changePassword(@NotNull User user, @NotNull String currentPassword,
                                @NotNull String newPassword) {
         Objects.requireNonNull(user, "User cannot be null");
-        if (!verifyPassword(currentPassword, user.passwordHash())) {
+        if (verifyPassword(currentPassword, user.passwordHash())) {
             throw new AuthException("Current password is incorrect");
         }
         if (newPassword.length() < 6) {

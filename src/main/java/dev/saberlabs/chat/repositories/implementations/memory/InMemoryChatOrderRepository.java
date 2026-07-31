@@ -9,9 +9,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class InMemoryChatOrderRepository implements ChatOrderRepository {
 
+    private static final Pattern TRAILING_NUMBER = Pattern.compile("ORD-(\\d+)");
     private final List<StoredOrder> orders = new ArrayList<>();
     private final AtomicInteger idCounter = new AtomicInteger(0);
 
@@ -22,8 +25,10 @@ public class InMemoryChatOrderRepository implements ChatOrderRepository {
 
     @Override
     public synchronized @NotNull StoredOrder save(@NotNull StoredOrder order) {
+        int maxId = extractTrailingNumber(order.id());
         orders.removeIf(o -> o.id().equals(order.id()));
         orders.add(order);
+        idCounter.updateAndGet(current -> Math.max(current, maxId));
         return order;
     }
 
@@ -82,5 +87,10 @@ public class InMemoryChatOrderRepository implements ChatOrderRepository {
 
     public synchronized void clear() {
         orders.clear();
+    }
+
+    private int extractTrailingNumber(@NotNull String id) {
+        Matcher matcher = TRAILING_NUMBER.matcher(id);
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
     }
 }

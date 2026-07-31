@@ -168,7 +168,7 @@ public class AuthService {
                 .orElseThrow(() -> new AuthException(
                         "No account found for username: " + username));
 
-        if (verifyPassword(password, user.passwordHash())) {
+        if (!verifyPassword(password, user.passwordHash())) {
             throw new AuthException("Incorrect password for: " + username);
         }
 
@@ -248,7 +248,6 @@ public class AuthService {
                     plainPassword.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hash);
         } catch (NoSuchAlgorithmException e) {
-            // SHA-256 is guaranteed to be available in all Java implementations
             throw new RuntimeException("SHA-256 algorithm not available", e);
         }
     }
@@ -264,7 +263,7 @@ public class AuthService {
                                   @NotNull String storedHash) {
         Objects.requireNonNull(plainPassword, "Password cannot be null");
         Objects.requireNonNull(storedHash, "Stored hash cannot be null");
-        return !hashPassword(plainPassword).equals(storedHash);
+        return hashPassword(plainPassword).equals(storedHash);
     }
 
     /**
@@ -279,7 +278,7 @@ public class AuthService {
     public void changePassword(@NotNull User user, @NotNull String currentPassword,
                                @NotNull String newPassword) {
         Objects.requireNonNull(user, "User cannot be null");
-        if (verifyPassword(currentPassword, user.passwordHash())) {
+        if (!verifyPassword(currentPassword, user.passwordHash())) {
             throw new AuthException("Current password is incorrect");
         }
         if (newPassword.length() < 6) {

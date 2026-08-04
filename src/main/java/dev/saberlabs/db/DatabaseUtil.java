@@ -27,8 +27,11 @@ public class DatabaseUtil {
 
     private static final String DB_DIR  = "data";
     private static final String DB_FILE = "data/coffee-chat.db";
-    private static final String URL     = "jdbc:sqlite:" + DB_FILE;
+    private static final String URL     = "jdbc:sqlite:";
     private static final String SCHEMA_RESOURCE = "/schema.sql";
+
+    // For testing purposes, allows overriding the database path to a temporary file.
+    private static String dbPathOverride = null;
 
     private static volatile Connection connection = null;
 
@@ -39,15 +42,14 @@ public class DatabaseUtil {
             synchronized (DatabaseUtil.class) {
                 if (connection == null) {
                     try {
-                        Files.createDirectories(Path.of(DB_DIR));
-                        connection = DriverManager.getConnection(URL);
-                        System.out.println("[DatabaseUtil] Connected to: " + DB_FILE);
+                        String path = dbPathOverride != null ? dbPathOverride : DB_FILE;
+                        Files.createDirectories(Path.of(path).getParent());
+                        connection = DriverManager.getConnection(URL + path);
+                        System.out.println("[DatabaseUtil] Connected to: " + path);
                     } catch (SQLException e) {
-                        throw new RuntimeException(
-                                "Failed to connect to the database: " + DB_FILE, e);
+                        throw new RuntimeException("Failed to connect to the database", e);
                     } catch (IOException e) {
-                        throw new RuntimeException(
-                                "Failed to create data directory: " + DB_DIR, e);
+                        throw new RuntimeException("Failed to create data directory", e);
                     }
                 }
             }
@@ -69,6 +71,15 @@ public class DatabaseUtil {
                 }
             }
         }
+    }
+
+    /**
+     * Overrides the database file path — must be called BEFORE the first
+     * call to getConnection() or initialize(). Intended for test isolation;
+     * production code should never call this.
+     */
+    public static void setDbPathForTesting(@NotNull String path) {
+        dbPathOverride = path;
     }
 
     public static void execSQL(@NotNull String sql) {

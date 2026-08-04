@@ -73,6 +73,15 @@
             <version>26</version>
         </dependency>
 
+        <!-- Source: https://mvnrepository.com/artifact/org.testfx/testfx-junit5 -->
+        <!-- TestFX for JavaFX UI testing -->
+        <dependency>
+            <groupId>org.testfx</groupId>
+            <artifactId>testfx-junit5</artifactId>
+            <version>4.0.18</version>
+            <scope>test</scope>
+        </dependency>
+
 
     </dependencies>
 

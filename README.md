@@ -1,304 +1,387 @@
-# Coffee Shop Design Patterns
+# Welcome to My Coffee Chat
 ***
 
 ## Task
+A coffee shop simulation started as a pure design-patterns exercise, then grew into a
+concurrent order-processing system, and finally into a full chat-based ordering
+application with a JavaFX desktop client. Each phase had its own core challenge:
 
-Implement a Java coffee shop simulation that demonstrates **10 Gang of Four design patterns** working together in a cohesive application.
-The challenge is not just to implement each pattern in isolation, but to make them interact naturally - for example, the Facade coordinates the Factory, Decorator, Strategy, Command, Adapter, Observer, Template Method, Prototype, and Singleton together in a single `placeOrder` → `processOrder` flow.
+### Quick Reminder of the previous Project Phases:
+
+- **Design Patterns phase**  implement all 10 assigned GoF patterns *correctly*, not
+  as superficial approximations, and make them cooperate inside one cohesive
+  application rather than existing as isolated textbook examples.
+- **Multithreading phase**  extend the same application so multiple customers can
+  place orders concurrently while baristas prepare them in the background, using a
+  thread-safe order queue (the classic producer-consumer problem) without corrupting
+  shared state like loyalty tiers or order counters.
+- **Coffee Chat phase (this project)**  extend it again with a real chat feature:
+1. **PART 1** (The `CoffeeChatAppCLI` class as a main entry point for this part):
+   customers and baristas exchange messages via a CLI chat application, orders get placed *through conversation* and commanded by the customer
+   rather than a menu, payment happens as an explicit step in the chat, and everything
+   is persisted to a relational database via JDBC.
+2. **PART 2** (The `CoffeeChatAppFX` class as a main entry point for this part):
+   Wraps all of this in a JavaFX desktop UI with chat bubbles, image sharing,
+   and multi-window support so
+   different roles can be tested side by side in one running process.
+   The central challenge throughout was **extending a system without breaking it**
+   every new phase had to reuse the previous phase's patterns and classes rather than
+   replacing them, while still solving genuinely new problems (thread safety, live
+   matchmaking between customers and baristas, UI thread safety, session-scoped
+   messaging vs. user-scoped notifications).
 
 ## Description
+The application introduces a **Part 01 Chat Module (CLI-based)** and **Part 02 Desktop Interface (JavaFX)** to the coffee shop ecosystem:
 
-The application models a real coffee shop lifecycle:
+### **Part 1 — Chat + JDBC (console)**
+- **SQLite** persistence via a handwritten JDBC layer (`DatabaseUtil`, one schema
+  file, no ORM) storing users, chat sessions, messages, notifications, orders, and
+  image uploads.
+- **Repository pattern, applied consistently** — every domain (`User`, `ChatMessage`,
+  `ChatSession`, order tracking) has an interface with a `Sqlite*` implementation, the
+  same discipline as the original JSON-file `Order`/`Customer` repositories from
+  Part 0, so the whole codebase tells one consistent story regardless of storage
+  technology.
+- **Role-based accounts** — `CUSTOMER`, `BARISTA`, `MANAGER`, seeded with a default
+  manager on first run, SHA-256 password hashing (no plain text, ever).
+- **A real barista-pool matching engine (`BaristaQueue`)** — customers queue as
+  `WAITING`, baristas queue as `READY`, and the two are matched FIFO under a single
+  `ReentrantLock`, structurally the same producer-consumer shape as `OrderQueue` from
+  Part 1, just applied to *conversations* instead of *coffee orders*.
+- **The human Barista is a "waiter," not the "cook"** — a chat-side barista decides
+  *when* to send an order to the kitchen; the actual preparation still runs on the
+  original Part 1 worker `Barista` threads, completely automated and untouched.
+- **Explicit payment step** — an order reaching `READY` does **not** automatically
+  become `FULFILLED`. The customer pays through the chat (Cash / PayPal / Stripe, via
+  the existing Adapter pattern), which is what triggers `FULFILLED` and the loyalty
+  increment — chosen deliberately so a customer can keep chatting after their coffee
+  is ready (extra orders, questions, complaints) instead of the session being forced
+  closed.
+- **Message type separation** — `CHAT_MESSAGE` vs. `SYSTEM_MESSAGE` (session-scoped,
+  stored in `messages`) is kept distinct from `ChatNotification` (user-scoped, stored
+  in `notifications`) so "your order is ready" reaches *only* the customer regardless
+  of who else is looking at that conversation.
 
-1. A customer walks in and **orders** a coffee type (Factory Method)
-2. They add **extras** like milk or sugar (Decorator)
-3. Their **loyalty tier** determines the price (Strategy)
-4. The shop **registers** the order (Singleton)
-5. The customer is **notified** of status changes (Observer)
-6. Staff **prepare** the coffee following a fixed recipe (Template Method)
-7. **Payment** is collected via PayPal, Stripe, or Cash (Adapter)
-8. Every action is encapsulated as a **command** and can be undone (Command)
-9. **Reorders** clone the previous order without rebuilding it (Prototype)
-10. All of the above is orchestrated through a single **facade** (Facade)
-
-An interactive **CLI** (`CoffeeShopCLI`) is also included to experience all patterns live in the terminal.
+  #### **Part 2 — JavaFX Desktop UI**
+- **`CoffeeChatFX`** as a separate entry point sharing the exact same service layer as
+  the Part 2.1 console app (`CoffeeChatApp`) — zero duplication of business logic,
+  only the presentation layer differs.
+- **Login → role-based routing** to dedicated Customer / Barista / Manager windows,
+  each receiving its logged-in `User` and owning `Stage` explicitly via a
+  `SessionAware` interface (rather than a shared mutable "current user" field), which
+  is what makes **multiple windows in the same process safely log in as different
+  roles simultaneously** — the correct way to manually test "barista + customer at
+  once" without running two separate, disconnected JVM processes.
+- **Real chat bubbles** — a custom `ListCell` renderer (`ChatBubbleCell`) aligns the
+  logged-in user's own messages right and everyone else's left, renders shared images
+  inline as thumbnails, and the whole list auto-refreshes via an `ObservableList` fed
+  by the existing Observer pattern — no manual polling or refresh buttons needed.
+- **Photo sharing** — images are stored as SQLite BLOBs and rendered as a real
+  thumbnail gallery (`FlowPane` of cards), not just filenames.
+- **Emoji support** — a lightweight in-app picker inserts Unicode emoji directly into
+  the message field, which JavaFX renders natively.
+- **A café-themed visual identity** — a coherent espresso/caramel/honey-gold palette
+  applied consistently across every screen via one shared stylesheet.
 
 ## Installation
-
-**Prerequisites:** Java 25, Maven 4.0.0
+Requires **JDK 25+** and **Maven**.
 
 ```bash
-# Clone and build
-git clone <repo-url>
-cd MyDesignPattern
-mvn clean compile
+git clone https://git.us.qwasar.io/my_coffee_chat_214476_-yutyk/my_coffee_chat.git
+cd my_coffee_chat
+mvn clean install
 ```
+
+The SQLite JDBC driver and JavaFX modules are pulled automatically via Maven; no
+manual native library setup is required.
 
 ## Usage
+### Console version (Part 1)
 
-### Run the demo (all 10 patterns in sequence)
-
-```bash
-mvn exec:java -Dexec.mainClass="dev.saberlabs.CoffeeShopApplication"
-```
-
-Or from your IDE: run `CoffeeShopApplication.main()`.
-
-### Run the interactive CLI
-
-Uncomment `new CoffeeShopCLI().run()` in `CoffeeShopApplication` and run again.  
-The CLI lets you create customers, place orders, pay with different methods, undo actions, and view command history in real time.
-
-### Run all tests
+1.  Run the console app:
 
 ```bash
-mvn clean test
+mvn clean compile exec:java "-Dexec.mainClass=dev.saberlabs.CoffeeChatAppCLI"
 ```
-Expected output: 
+Or via IntelliJ: right-click `CoffeeChatAppCLI` → Run.
 
+**How it Works**
+- first login as a `MANAGER` to create barista's accounts. (in this step choices are numbered, you will be prompted to enter the number of your choice)
+- use the following credentials to login as a manager:
+    - username: `manager`
+    - password: `manager123`
+```bash
+════════════════════════════════════════════════════════
+   ☕  COFFEE CHAT — LOGIN  ☕
+════════════════════════════════════════════════════════
+
+  1. Login
+  2. Register
+  0. Exit
+
+  Your choice: 1
+
+  Username: manager
+  Password: manager123
+[AuthService] manager logged in as MANAGER.
+
+  ✓ Welcome back, manager (MANAGER)!
+
+
+────────────────────────────────────────────────────────
+  ☕ Manager Dashboard — manager
+────────────────────────────────────────────────────────
+
+  Commands:
+    create-barista <username> <password>  create a barista account
+    list-users                            show all users
+    delete-user <id>                      remove a user account
+    sessions                              show all chat sessions + status
+    history <session-id>                  show one session's conversation
+    all-messages                          show every message, all sessions
+    help                                  show this help message
+    quit                                  log out
+
+[manager] > create-barista barista password
+[AuthService] New BARISTA registered: barista
+  ✓ Barista account created: barista (ID: 3)
+
+[manager] > 
+```
+
+- then logout and register a new account as a customer you will be redirected to the customer view chat interface after a successful registration.
+- (in this step choices are numbered, you will be prompted to enter the number of your choice)
+```bash
+────────────────────────────────────────────────────────
+  ☕ Welcome, <Your Name>!
+────────────────────────────────────────────────────────
+  1. Start Chat
+  2. My Order History
+  3. My Info
+  4. Quit
+
+  Your choice:
+```
+- Start a chat with a barista, place an order, and pay for it. The barista will receive the order in their own chat interface once he logs in.
+```bash
+────────────────────────────────────────────────────────
+  ☕ Welcome, yassine!
+────────────────────────────────────────────────────────
+  1. Start Chat
+  2. My Order History
+  3. My Info
+  4. Quit
+
+  Your choice: 1
+
+────────────────────────────────────────────────────────
+  You're in the queue — waiting for the next available barista...
+────────────────────────────────────────────────────────
+  No messages yet in this session.
+
+  Commands:
+    order <coffee> [extras]   e.g. order cappuccino milk sugar
+    pay                       pay for a READY order
+    history                   show this session's messages
+    back                      return to menu (session stays open)
+    end chat                  close this session
+    help                      show this help message
+  Available coffees: espresso, cappuccino, latte
+  Available extras:  milk, sugar, whipped
+
+[yassine] > Hello!
+
+[yassine] > order cappuccino milk sugar
+[NOTIFICATION] yassine Your order has been placed.
+[CoffeeShop] New Order Placed: Order[customer=yassine, coffee=Cappuccino + Milk + Sugar, price=$4,25, tier=REGULAR, status=PLACED]
+
+  [01:32] ⚙️ System: Order placed! Cappuccino + Milk + Sugar — $4,25 (Order #ORD-1). Waiting for the barista to send it to the kitchen.
+[yassine] > 
+[yassine] > 
+```
+- type `back` to return to the main menu, then `4` to log out. The barista can now log in and see the order in their chat interface.
+- login as the barista you created earlier, and you will see the order in your chat interface. You can then send it to the kitchen for preparation.
+```bash
+✓ Welcome back, barista (BARISTA)!
+
+
+────────────────────────────────────────────────────────
+  ☕ Barista barista on duty.
+────────────────────────────────────────────────────────
+  ✓ Immediately matched with Session #1
+
+  ── All Sessions ──
+  ID     Customer     Status     Assigned To  Pending   
+  ────────────────────────────────────────────────────────
+  1      3            ACTIVE     You          1 order(s)
+
+  Kitchen queue: 0/10 orders waiting
+
+  Commands:
+    dashboard                  show all sessions and their status
+    switch <session-id>        switch to one of YOUR active sessions
+    send-to-kitchen <order-id> manually send an order for preparation
+    end                        end the current session
+    back                       deselect the current session
+    help                       show this help message
+    quit                       clock out
+  Anything else is sent as a chat reply in the current session.
+
+[barista] > dashboard
+
+  ── All Sessions ──
+  ID     Customer     Status     Assigned To  Pending   
+  ────────────────────────────────────────────────────────
+  1      3            ACTIVE     You          1 order(s)
+
+  Kitchen queue: 0/10 orders waiting
+
+[barista] > switch 1
+  ✓ Switched to session #1
+  ── Conversation ──
+  [01:32] 👤 yassine: Hello!
+  [01:32] 👤 yassine: order cappuccino milk sugar
+  [01:32] ⚙️ System: Order placed! Cappuccino + Milk + Sugar — $4,25 (Order #ORD-1). Waiting for the barista to send it to the kitchen.
+  [01:35] 👤 yassine: quit
+  [01:35] 💬 System: yassine has left the conversation (still reachable).
+  [01:35] ⚙️ System: You are now connected. Barista ID: 2
+
+  ⚠ 1 order(s) waiting to be sent to the kitchen — type 'send-to-kitchen' to review.
+
+[barista] > send-to-kitchen
+
+  ── Pending Orders (not yet sent to kitchen) ──
+  1. [ORD-1   ] cappuccino + milk + sugar    $4,25  placed: 01:32
+  Select order to send to kitchen (number, or 0 to cancel): 1
+[OrderQueue] Enqueued: Cappuccino + Milk + Sugar for yassine (1/10)
+[OrderQueue] Dequeued: Cappuccino + Milk + Sugar for yassine (0/10)
+[Barista-1] Preparing: Cappuccino + Milk + Sugar for yassine...
+
+====== Starting Espresso preparation... ======
+[Preparation][Step 1] Boiling water to 95°C for 25 seconds...
+[Preparation][Step 2] Starting the brewing process for espresso...
+	[Brewing-1]: Using 18-20g of finely ground coffee to produce a strong double shot...
+	[Brewing-2]: Extracting for about 25-30 seconds to achieve a rich and concentrated flavor...
+	[Brewing-3]: Ensuring the espresso has a good crema on top...
+	[Brewing-4]: Pouring the espresso into a 6oz cup...
+==== Espresso is ready! =====
+[Preparation][Step 3] Pouring into cup...
+[Preparation][Step 4] No condiments: Skipping condiments for espresso...
+[Preparation][Step 5] Espresso is ready!
+
+  [01:36] ⚙️ System: Order #ORD-1 sent to the kitchen!
+[barista] > 
+[barista] > [NOTIFICATION] yassine  Your order is ready for pickup.
+[Barista-1] ✓ Completed order for yassine (1 total)
+[OrderQueue] Empty -- barista waiting...
+
+
+[barista] > back
+
+[barista] > quit
+[barista] Clocking out.
+
+
+Return to login screen? (y/n): y
+```
+- login again as the customer, and you will see the notification that your order is ready. You can then pay for it through the chat interface.
+```bash
+  ── Missed Notifications ──
+  [01:35] 🔔 You are now connected with Barista #2!
+  [01:36] 🔔 Your Cappuccino + Milk + Sugar is ready for pickup! (Order #ORD-1)
+[ChatNotificationRepository] Marked 2 notification(s) as read for user 3.
+
+────────────────────────────────────────────────────────
+  ☕ Welcome, yassine!
+────────────────────────────────────────────────────────
+  1. Start Chat
+  2. My Order History
+  3. My Info
+  4. Quit
+
+  Your choice: 1
+
+────────────────────────────────────────────────────────
+  Connected! Barista ID: 2
+────────────────────────────────────────────────────────
+  ── Conversation ──
+  [01:32] 👤 yassine: Hello!
+  [01:32] 👤 yassine: order cappuccino milk sugar
+  [01:32] ⚙️ System: Order placed! Cappuccino + Milk + Sugar — $4,25 (Order #ORD-1). Waiting for the barista to send it to the kitchen.
+  [01:35] 👤 yassine: quit
+  [01:35] 💬 System: yassine has left the conversation (still reachable).
+  [01:35] ⚙️ System: You are now connected. Barista ID: 2
+  [01:36] ⚙️ System: Order #ORD-1 sent to the kitchen!
+
+  Commands:
+    order <coffee> [extras]   e.g. order cappuccino milk sugar
+    pay                       pay for a READY order
+    history                   show this session's messages
+    back                      return to menu (session stays open)
+    end chat                  close this session
+    help                      show this help message
+  Available coffees: espresso, cappuccino, latte
+  Available extras:  milk, sugar, whipped
+
+[yassine] > pay
+
+  ── Orders Ready for Payment ──
+  1. cappuccino + milk + sugar      $4,25 (ORD-1)
+  Select order to pay (number, or 0 to cancel): 1
+  Payment method:
+    1. Cash
+    2. PayPal
+    3. Credit Card (Stripe)
+    0. Cancel
+  Choice: 1
+  Amount due: $4,25
+  Cash received: $5
+  Change to return: $0,75
+[CashRegister] Collected $4,25. Change: $0,75
+
+  [01:39] 🔔 Your order #ORD-1 has been fulfilled. Enjoy your coffee! ☕
+[yassine] > [NOTIFICATION] yassine  Your order has been fulfilled. Enjoy your coffee :)
+
+  [01:39] ⚙️ System: ✅ Payment of $4,25 received for order #ORD-1. Transaction complete!
+[yassine] >   ✓ Payment of $4,25 confirmed. Enjoy your coffee!
+
+[yassine] > 
+```
+### Desktop version (Part 2)
+1.  Run the JavaFX app:
+```bash
+mmvn javafx:run
+```
+Or via IntelliJ: Right-click on `CoffeeShopApp` **NOT** `CoffeeChatAppFX` → Run.
+but first you need to uncomment the `CoffeeChatAppFX.main(args);` line in `CoffeeShopApp.java` and comment out the `CoffeeShopApp.main(args);` line.
+
+- You can open multiple login windows and log in as different users (barista, customer, manager) simultaneously. Each window will maintain its own session and chat interface.
+- Just click `Open Another Window` to open a new login window and log in as a different user.
+- orders can be place as a chat message, and the barista will receive it in their own chat interface.
+- The barista can then send the order to the kitchen for preparation, and the customer will receive a notification when the order is ready.
+- The customer can then pay for the order through the chat interface.
+- Emojies can be inserted into chat messages using the emoji picker, and images can be shared as thumbnails in the chat interface.
+
+### Testing
+- Unit tests are located in the `src/test/java` directory. Run them with:
+```bash
+mvn test
+```
+you can also run individual test classes or methods from your IDE.
+
+you should see output indicating that all tests passed successfully.
 ```bash
 [INFO] Results:
 [INFO] 
-[INFO] Tests run: 92, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 325, Failures: 0, Errors: 0, Skipped: 0
 [INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  02:26 min
+[INFO] Finished at: 2026-08-06T00:31:34+01:00
+[INFO] ------------------------------------------------------------------------
 ```
-
-Or run each test class individually from your IDE.
-
-
-
----
-
-## Documentation
-
-Every pattern is self-documented inside its own package under `src/main/java/dev/saberlabs/<pattern>/`:
-
-| File | What it contains |
-|------|-----------------|
-| `doc.md` | GoF definition, intent, the problem it solves in this project, ASCII structure diagram, key classes table, code walkthrough, and integration with the other patterns |
-| `*Demo.java` | Runnable demo that exercises the pattern in isolation |
-| All `.java` sources | Class-level Javadoc on every key type, cross-linked with `{@link}` references to related pattern classes |
-
-To read a pattern's full documentation, open `src/main/java/dev/saberlabs/<pattern>/doc.md`.  
-For example: [`facade/doc.md`](src/main/java/dev/saberlabs/facade/doc.md) explains how the Facade coordinates all 9 other patterns in a single `placeOrder → processOrder` call.
-
----
-
-## The Coffee Shop 10 Design Patterns
-
-### 1. Singleton - `dev.saberlabs.singleton`
-
-`CoffeeShop` is the single global registry for all orders and the notification service. Implemented with double-checked locking and a `volatile` instance variable for thread safety.
-
-```java
-CoffeeShop shop = CoffeeShop.getInstance(); // always the same object
-shop.placeOrder(order);
-```
-
-Key files: `CoffeeShop.java`, `SingletonDemo.java`
-
----
-
-### 2. Factory Method - `dev.saberlabs.factory`
-
-`CoffeeCreator` is the abstract creator. Concrete subclasses (`EspressoCreator`, `CappuccinoCreator`, `LatteCreator`) decide which `Coffee` object to instantiate. Client code depends only on the `CoffeeCreator` abstraction.
-
-```java
-CoffeeCreator creator = new CappuccinoCreator();
-Coffee coffee = creator.createCoffee(); // returns Cappuccino without coupling to it
-```
-
-Key files: `CoffeeCreator.java`, `EspressoCreator.java`, `CappuccinoCreator.java`, `LatteCreator.java`, `FactoryMethodDemo.java`
-
----
-
-### 3. Decorator - `dev.saberlabs.decorator`
-
-`CoffeeDecorator` wraps any `Coffee` object and forwards calls to the inner component. Each concrete decorator (`MilkDecorator`, `SugarDecorator`, `WhippedCreamDecorator`) adds its own cost and description on top.
-
-```java
-Coffee fancy = new WhippedCreamDecorator(
-                   new MilkDecorator(
-                       new SugarDecorator(new Espresso())));
-// "Espresso, Sugar, Milk, Whipped Cream" - $4.00
-```
-
-Key files: `CoffeeDecorator.java`, `MilkDecorator.java`, `SugarDecorator.java`, `WhippedCreamDecorator.java`, `DecoratorDemo.java`
-
----
-
-### 4. Prototype - `dev.saberlabs.prototype`
-
-`CloneableCoffee` and `CloneableOrder` define the cloning contracts. `Order.cloneOrder()` creates a deep copy for the same customer; `Order.cloneOrder(Customer)` creates a copy for a different customer - useful for "I'll have what she's having."
-
-```java
-Order aliceOrder = new Order(alice, decoratedCoffee, id);
-Order bobOrder   = aliceOrder.cloneOrder(bob); // same coffee, new customer
-```
-
-Key files: `CloneableCoffee.java`, `CloneableOrder.java`, `PrototypeDemo.java`
-
----
-
-### 5. Template Method - `dev.saberlabs.template`
-
-`CoffeePreparationTemplate` defines the fixed algorithm skeleton: boil water → brew → steam milk → add condiments → serve. Subclasses (`EspressoPreparation`, `CappuccinoPreparation`, `LattePreparation`) override only the steps that vary.
-
-```java
-CoffeePreparationTemplate prep = new CappuccinoPreparation();
-prep.prepareCoffee(); // runs the full fixed algorithm
-List<String> log = prep.getPreparationLog();
-```
-
-Key files: `CoffeePreparationTemplate.java`, `EspressoPreparation.java`, `CappuccinoPreparation.java`, `LattePreparation.java`, `TemplateMethodDemo.java`
-
----
-
-### 6. Strategy - `dev.saberlabs.strategy`
-
-`PricingStrategy` defines how to calculate the final price from a base cost. Three strategies implement tiered loyalty discounts. The correct strategy is automatically resolved from the customer's `LoyaltyTier` at order creation.
-
-| Tier | Orders needed | Discount |
-|------|--------------|---------|
-| REGULAR | 0–5 | 0% |
-| SILVER | 6–10 | 10% |
-| GOLD | 11+ | 20% |
-
-```java
-// Strategy is selected automatically from the customer's tier
-Order order = new Order(goldCustomer, coffee, id);
-double price = order.getFinalPrice(); // already discounted 20%
-```
-
-Key files: `PricingStrategy.java`, `RegularPricing.java`, `SilverMemberPricing.java`, `GoldMemberPricing.java`, `StrategyDemo.java`
-
----
-
-### 7. Observer - `dev.saberlabs.observer`
-
-`OrderObserver` receives `update(Order, OrderStatus)` callbacks. `Customer` implements `OrderObserver` and filters notifications to only its own orders. `CoffeeShop` delegates to `OrderNotificationService` which maintains the observer list.
-
-```java
-shop.registerObserver(alice);
-order.setStatus(OrderStatus.READY);     // → alice gets notified
-order.setStatus(OrderStatus.FULFILLED); // → alice gets notified + tier increments
-```
-
-Key files: `OrderObserver.java`, `Observable.java`, `OrderNotificationService.java`, `ObserverDemo.java`
-
----
-
-### 8. Command - `dev.saberlabs.command`
-
-Every order action is an object: `PlaceOrderCommand`, `PrepareOrderCommand`, `PayOrderCommand`, `FulfillOrderCommand`. `OrderInvoker` executes commands, records a full history, and maintains an undo stack so any action can be reversed.
-
-```java
-invoker.executeCommand(new PlaceOrderCommand(order));   // PLACED
-invoker.executeCommand(new PrepareOrderCommand(order)); // READY
-invoker.executeCommand(new FulfillOrderCommand(order)); // FULFILLED
-invoker.undoLastCommand();                              // back to READY
-```
-
-Key files: `Command.java`, `OrderInvoker.java`, `PlaceOrderCommand.java`, `PrepareOrderCommand.java`, `PayOrderCommand.java`, `FulfillOrderCommand.java`, `CommandDemo.java`
-
----
-
-### 9. Adapter - `dev.saberlabs.adapter`
-
-`PaymentGateway` is the unified target interface. Three incompatible payment services are adapted to it without modifying the originals:
-
-| Adapter | Wraps | Notes |
-|---------|-------|-------|
-| `PayPalAdapter` | `PayPalPaymentService` | Dollar → cents conversion |
-| `StripeAdapter` | `StripePaymentService` | Card validation (number, expiry, CVV) |
-| `CashPaymentAdapter` | `CashPaymentService` | Change calculation, register total |
-
-```java
-PaymentGateway gateway = new StripeAdapter(stripeService);
-gateway.processPayment("ORDER-001", 3.50); // same call regardless of provider
-```
-
-Key files: `PaymentGateway.java`, `PayPalAdapter.java`, `StripeAdapter.java`, `CashPaymentAdapter.java`, `AdapterDemo.java`
-
----
-
-### 10. Facade - `dev.saberlabs.facade`
-
-`CoffeeShopFacade` hides all 9 other patterns behind a minimal API. A client only needs to know 4 methods to run a full order lifecycle.
-
-```java
-CoffeeShopFacade facade = new CoffeeShopFacade(paymentGateway);
-facade.registerCustomer(alice);
-Order order = facade.placeOrder(alice, new EspressoCreator(), "milk", "sugar");
-facade.processOrder(order);   // prepare → pay → fulfill
-facade.reorder(order);        // clone + full lifecycle
-facade.undoLastAction();      // undo any command
-```
-
-Key files: `CoffeeShopFacade.java`, `FacadeDemo.java`
-
----
-
-## Project Structure
-
-```
-src/
-├── main/java/dev/saberlabs/
-│   ├── CoffeeShopApplication.java   ← entry point (runs all demos)
-│   ├── adapter/       ← Pattern 9  - PaymentGateway + 3 adapters + AdapterDemo + doc.md
-│   ├── cli/           ← Interactive CLI (CoffeeShopCLI)
-│   ├── command/       ← Pattern 8  - 4 commands + invoker + CommandDemo + doc.md
-│   ├── decorator/     ← Pattern 3  - 3 decorators + DecoratorDemo + doc.md
-│   ├── facade/        ← Pattern 10 - CoffeeShopFacade + FacadeDemo + doc.md
-│   ├── factory/       ← Pattern 2  - 3 creators + FactoryMethodDemo + doc.md
-│   ├── models/        ← Domain (Coffee, Order, Customer, OrderStatus, LoyaltyTier)
-│   ├── observer/      ← Pattern 7  - OrderObserver + NotificationService + ObserverDemo + doc.md
-│   ├── prototype/     ← Pattern 4  - CloneableCoffee + CloneableOrder + PrototypeDemo + doc.md
-│   ├── singleton/     ← Pattern 1  - CoffeeShop + SingletonDemo + doc.md
-│   ├── strategy/      ← Pattern 6  - 3 pricing strategies + StrategyDemo + doc.md
-│   └── template/      ← Pattern 5  - 3 preparations + TemplateMethodDemo + doc.md
-└── test/java/dev/saberlabs/
-    ├── adapter/       AdapterTest.java   (28 tests)
-    ├── command/       CommandTest.java   (13 tests)
-    ├── decorator/     DecoratorTest.java  (4 tests)
-    ├── facade/        FacadeTest.java    (14 tests)
-    ├── factory/       FactoryMethodTest.java (3 tests)
-    ├── observer/      ObserverTest.java   (6 tests)
-    ├── prototype/     PrototypeTest.java  (5 tests)
-    ├── singleton/     SingletonTest.java  (3 tests - includes thread-safety)
-    ├── strategy/      StrategyTest.java   (6 tests)
-    └── template/      TemplateMethodTest.java (10 tests)
-```
-
-**Total: 92 tests, 0 failures.**
-
----
-
-## How the Patterns Connect
-
-```
-CoffeeShopFacade.placeOrder()
-  └─ FactoryMethod   creates base Coffee
-  └─ Decorator       wraps Coffee with extras
-  └─ Strategy        prices Order from Customer's LoyaltyTier
-  └─ Singleton       registers Order in CoffeeShop
-  └─ Command         wraps PlaceOrderCommand → executes + logs to history
-
-CoffeeShopFacade.processOrder()
-  └─ Command         PrepareOrderCommand
-       └─ Template   runs the preparation recipe for this coffee type
-  └─ Command         PayOrderCommand
-       └─ Adapter    routes payment to PayPal / Stripe / Cash
-  └─ Command         FulfillOrderCommand
-       └─ Observer   notifies all registered customers
-       └─ Strategy   LoyaltyTier recalculated after increment
-
-CoffeeShopFacade.reorder()
-  └─ Prototype       cloneOrder() creates a copy without rebuilding it
-  └─ (full processOrder cycle above)
-```
-
----
 
 ### The Core Team
 

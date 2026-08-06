@@ -22,7 +22,7 @@ import static org.testfx.matcher.control.LabeledMatchers.hasText;
 
 @ExtendWith(ApplicationExtension.class)
 @DisplayName("BaristaController")
-class BaristaControllerTest extends FxTestBase {
+class _2BaristaControllerTest extends FxTestBase {
 
     private BaristaController controller;
     private User testUser;

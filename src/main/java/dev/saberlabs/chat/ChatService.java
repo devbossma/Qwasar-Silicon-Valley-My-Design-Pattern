@@ -5,13 +5,6 @@ import dev.saberlabs.auth.User;
 import dev.saberlabs.chat.repositories.ChatOrderRepository;
 import dev.saberlabs.chat.repositories.ChatRepository;
 import dev.saberlabs.chat.repositories.ChatSessionRepository;
-import dev.saberlabs.decorator.MilkDecorator;
-import dev.saberlabs.decorator.SugarDecorator;
-import dev.saberlabs.decorator.WhippedCreamDecorator;
-import dev.saberlabs.factory.CappuccinoCreator;
-import dev.saberlabs.factory.CoffeeCreator;
-import dev.saberlabs.factory.EspressoCreator;
-import dev.saberlabs.factory.LatteCreator;
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
@@ -50,11 +43,7 @@ public class ChatService {
 
     @NotNull private final Map<Long, Customer> customerCache = new HashMap<>();
 
-    @NotNull private final Map<String, CoffeeCreator> menu = Map.of(
-            "espresso", new EspressoCreator(),
-            "cappuccino", new CappuccinoCreator(),
-            "latte", new LatteCreator()
-    );
+    @NotNull private final OrderCommandParser orderCommandParser = new OrderCommandParser();
 
     public ChatService(@NotNull ChatRepository chatRepository,
                        @NotNull ChatSessionRepository sessionRepository,
@@ -74,6 +63,9 @@ public class ChatService {
     // Customer <-> User linking
     // ================================================================
 
+    // Invariant: never call into BaristaQueue (which holds its own ReentrantLock)
+    // from within this synchronized method, and never call this method while
+    // holding BaristaQueue's lock -- keeps the two locks from ever nesting.
     public synchronized @NotNull Customer resolveCustomer(@NotNull User user) {
         Objects.requireNonNull(user, "User cannot be null");
         if (!user.isCustomer()) {
@@ -234,7 +226,8 @@ public class ChatService {
 
 
     // ================================================================
-    // Order command parsing — now persists a StoredOrder row
+    // Order command handling — parsing is delegated to OrderCommandParser;
+    // this stays responsible for persisting the order and messaging both parties
     // ================================================================
 
     private @NotNull ChatMessage handleOrderCommand(@NotNull User user,
@@ -244,40 +237,28 @@ public class ChatService {
         sendMessage(session.id(), user.id(), user.username(), input);
 
         String[] parts = input.trim().split("\\s+");
-        if (parts.length < 2) {
-            return sendSystemMessage(session.id(),
+        OrderCommandParser.Result result = orderCommandParser.parse(parts);
+
+        return switch (result) {
+            case OrderCommandParser.MissingCoffeeType ignored -> sendSystemMessage(session.id(),
                     "Please specify a coffee type. Example: order espresso milk");
-        }
 
-        String coffeeType = parts[1].toLowerCase(Locale.ROOT);
-        CoffeeCreator creator = menu.get(coffeeType);
-        if (creator == null) {
-            return sendSystemMessage(session.id(),
-                    "Unknown coffee type: " + coffeeType
-                            + ". Available: " + String.join(", ", menu.keySet()));
-        }
+            case OrderCommandParser.UnknownCoffeeType(String coffeeType) -> sendSystemMessage(session.id(),
+                    "Unknown coffee type: " + coffeeType + ". Available: "
+                            + String.join(", ", orderCommandParser.availableCoffees()));
 
-        Coffee coffee = creator.createCoffee();
-
-        List<String> appliedExtras = new ArrayList<>();
-        List<String> unknownExtras = new ArrayList<>();
-        for (int i = 2; i < parts.length; i++) {
-            String extra = parts[i].toLowerCase(Locale.ROOT);
-            Coffee decorated = applyExtra(coffee, extra);
-            if (decorated == coffee) {
-                unknownExtras.add(extra);
-            } else {
-                coffee = decorated;
-                appliedExtras.add(extra);
-            }
-        }
-
-        if (!unknownExtras.isEmpty()) {
-            return sendSystemMessage(session.id(),
-                    "Unknown extra(s): " + String.join(", ", unknownExtras)
+            case OrderCommandParser.UnknownExtras(List<String> extras) -> sendSystemMessage(session.id(),
+                    "Unknown extra(s): " + String.join(", ", extras)
                             + ". Available: milk, sugar, whipped");
-        }
 
+            case OrderCommandParser.Parsed(String coffeeType, Coffee coffee, List<String> appliedExtras) ->
+                    placeParsedOrder(user, session, coffeeType, coffee, appliedExtras);
+        };
+    }
+
+    private @NotNull ChatMessage placeParsedOrder(@NotNull User user, @NotNull ChatSession session,
+                                                   @NotNull String coffeeType, @NotNull Coffee coffee,
+                                                   @NotNull List<String> appliedExtras) {
         Customer customer = resolveCustomer(user);
         String orderId = orderRepository.nextOrderId();
         Order order = new Order(customer, coffee, orderId);
@@ -413,15 +394,6 @@ public class ChatService {
                 order.getFinalPrice(), orderId));
 
         return true;
-    }
-
-    private @NotNull Coffee applyExtra(@NotNull Coffee coffee, @NotNull String extra) {
-        return switch (extra) {
-            case "milk" -> new MilkDecorator(coffee);
-            case "sugar" -> new SugarDecorator(coffee);
-            case "whipped", "whippedcream", "whipped_cream" -> new WhippedCreamDecorator(coffee);
-            default -> coffee;
-        };
     }
 
     private @NotNull ChatMessage sendSystemMessage(long sessionId, @NotNull String content) {

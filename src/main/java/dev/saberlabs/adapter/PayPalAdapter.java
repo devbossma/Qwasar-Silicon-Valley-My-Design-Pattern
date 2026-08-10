@@ -35,7 +35,7 @@ public class PayPalAdapter implements PaymentGateway {
     @Override
     public PaymentStatus getPaymentStatus(String orderId) {
         if (!orderHistory.containsKey(orderId)) {
-            throw new RuntimeException("[Payment Exception] No payment found for order ID: " + orderId);
+            throw new PaymentNotFoundException(orderId);
         }
         return orderHistory.getOrDefault(orderId, PaymentStatus.PAYMENT_FAILED);
     }

@@ -42,7 +42,7 @@ public class StripeAdapter implements PaymentGateway{
     @Override
     public PaymentStatus getPaymentStatus(String orderId) {
         if (!paymentHistory.containsKey(orderId)) {
-            throw new RuntimeException("[Payment Exception] No payment found for order ID: " + orderId);
+            throw new PaymentNotFoundException(orderId);
         }
         return paymentHistory.getOrDefault(orderId, PaymentStatus.PAYMENT_FAILED);
     }

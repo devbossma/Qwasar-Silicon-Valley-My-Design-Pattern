@@ -119,7 +119,7 @@ public class AppContext {
      */
     public void shutdown() {
         coffeeShop.close();
-        DatabaseUtil.closeConnection();
+        DatabaseUtil.closeAllConnections();
     }
 
     // ── Getters ──────────────────────────────────────────────────────

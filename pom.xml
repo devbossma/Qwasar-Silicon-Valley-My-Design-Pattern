@@ -34,13 +34,6 @@
             <version>26.1.0</version>
             <scope>compile</scope>
         </dependency>
-        <!-- JSON serialization for file-based Repository persistence -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.22.0</version>
-        </dependency>
-
         <!-- Source: https://mvnrepository.com/artifact/org.xerial/sqlite-jdbc -->
         <!-- SQLite JDBC driver for database persistence -->
         <dependency>

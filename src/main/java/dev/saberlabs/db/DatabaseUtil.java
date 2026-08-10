@@ -14,6 +14,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages the SQLite database connection for the coffee shop chat application.
@@ -22,6 +25,16 @@ import java.util.Arrays;
  * string literals — this keeps the schema readable, lets IDE SQL tooling
  * validate it directly, and matches the standard Flyway/Liquibase convention
  * of versioning schema as plain .sql files.
+ * *
+ * One JDBC {@link Connection} per thread, not one shared globally: every
+ * repository method does {@code DatabaseUtil.getConnection()} then a single
+ * statement, so each thread (worker Baristas, FX event threads, request
+ * handlers) gets its own connection lazily on first use, and nobody blocks
+ * on -- or corrupts the cursor state of -- a connection another thread is
+ * mid-query on. SQLite serializes writes at the file level regardless, but
+ * concurrent reads and prepared-statement state are now thread-isolated too,
+ * and the design carries over cleanly if the backend ever stops being
+ * single-file SQLite.
  */
 public class DatabaseUtil {
 
@@ -30,46 +43,78 @@ public class DatabaseUtil {
     private static final String URL     = "jdbc:sqlite:";
     private static final String SCHEMA_RESOURCE = "/schema.sql";
 
-    // For testing purposes, allows overriding the database path to a temporary file.
-    private static String dbPathOverride = null;
+    // Now that each thread opens its own connection to the same SQLite file,
+    // a writer on one thread can make another thread's connection hit
+    // SQLITE_BUSY. This makes the second connection wait for the lock
+    // instead of failing immediately.
+    private static final int BUSY_TIMEOUT_MS = 5000;
 
-    private static volatile Connection connection = null;
+    // For testing purposes, allows overriding the database path to a temporary file.
+    private static volatile String dbPathOverride = null;
+
+    private static final ThreadLocal<Connection> connectionHolder = new ThreadLocal<>();
+
+    // Tracked so closeAllConnections() can close connections opened by threads
+    // other than the caller (e.g. worker Baristas) during test/app shutdown.
+    private static final Set<Connection> openConnections =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private DatabaseUtil() { }
 
     public static @NotNull Connection getConnection() {
+        Connection connection = connectionHolder.get();
         if (connection == null) {
-            synchronized (DatabaseUtil.class) {
-                if (connection == null) {
-                    try {
-                        String path = dbPathOverride != null ? dbPathOverride : DB_FILE;
-                        Files.createDirectories(Path.of(path).getParent());
-                        connection = DriverManager.getConnection(URL + path);
-                        System.out.println("[DatabaseUtil] Connected to: " + path);
-                    } catch (SQLException e) {
-                        throw new RuntimeException("Failed to connect to the database", e);
-                    } catch (IOException e) {
-                        throw new RuntimeException("Failed to create data directory", e);
-                    }
+            try {
+                String path = dbPathOverride != null ? dbPathOverride : DB_FILE;
+                Files.createDirectories(Path.of(path).getParent());
+                connection = DriverManager.getConnection(URL + path);
+                try (Statement stmt = connection.createStatement()) {
+                    stmt.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MS);
                 }
+                connectionHolder.set(connection);
+                openConnections.add(connection);
+                System.out.println("[DatabaseUtil] Connected to: " + path
+                        + " (thread: " + Thread.currentThread().getName() + ")");
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to connect to the database", e);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to create data directory", e);
             }
         }
         return connection;
     }
 
+    /**
+     * Closes the calling thread's own connection, if it has one.
+     */
     public static void closeConnection() {
-        synchronized (DatabaseUtil.class) {
-            if (connection != null) {
-                try {
-                    connection.close();
-                    System.out.println("[DatabaseUtil] Connection closed.");
-                } catch (SQLException e) {
-                    throw new RuntimeException(
-                            "Failed to close database connection", e);
-                } finally {
-                    connection = null;
-                }
-            }
+        Connection connection = connectionHolder.get();
+        if (connection != null) {
+            closeQuietly(connection);
+            openConnections.remove(connection);
+            connectionHolder.remove();
+        }
+    }
+
+    /**
+     * Closes every connection opened by any thread. Intended for application
+     * shutdown and test teardown, where per-thread {@link #closeConnection()}
+     * can't reach connections opened by threads that have already exited.
+     */
+    public static void closeAllConnections() {
+        for (Connection connection : openConnections) {
+            closeQuietly(connection);
+        }
+        openConnections.clear();
+        connectionHolder.remove();
+    }
+
+    private static void closeQuietly(@NotNull Connection connection) {
+        try {
+            connection.close();
+            System.out.println("[DatabaseUtil] Connection closed.");
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to close database connection", e);
         }
     }
 

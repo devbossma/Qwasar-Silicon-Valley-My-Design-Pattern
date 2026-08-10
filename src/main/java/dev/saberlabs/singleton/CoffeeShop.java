@@ -11,13 +11,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Pattern 1: SINGLETON
@@ -37,8 +34,6 @@ public class CoffeeShop {
 
     // Volatile variable to ensure visibility of changes across threads and prevent instruction reordering issues.
     private static volatile CoffeeShop INSTANCE;
-    // Regular expression pattern to extract trailing numbers from IDs for syncing counters after restoring state.
-    private static final Pattern TRAILING_NUMBER = Pattern.compile("(\\d+)$");
 
     /**
      * Thread-safe list to store orders.
@@ -282,48 +277,6 @@ public class CoffeeShop {
 
 
     // ================================================================
-    // Persistence Support
-    // ================================================================
-
-    /**
-     * Restores orders from persistence layer after a restart.
-     * Bypasses setStatus to avoid triggering Observer notifications
-     * and loyalty increments on already-processed orders.
-     *
-     * @param restoredOrders the orders to restore
-     */
-    public void restoreOrders(@NotNull List<Order> restoredOrders) {
-        Objects.requireNonNull(restoredOrders, "Restored orders cannot be null");
-        synchronized (orders) {
-            orders.clear();
-            orders.addAll(restoredOrders);
-        }
-        syncOrderCounter(restoredOrders);
-        System.out.printf("[CoffeeShop] Restored %d orders from persistence.%n",
-                restoredOrders.size());
-    }
-
-    /**
-     * Synchronizes generated IDs with restored customer IDs.
-     * This method extracts the numeric part of the customer IDs,
-     * updates the customerIdCounter to ensure that new customers receive unique IDs that do not conflict with restored customers.
-     *
-     * @param customers restored customers
-     */
-    public void syncCustomerCounter(@NotNull Collection<Customer> customers) {
-        Objects.requireNonNull(customers, "Customers cannot be null");
-        int maxCustomerId = customers.stream()
-                .map(Customer::getId)
-                .mapToInt(this::extractTrailingNumber)
-                .max()
-                .orElse(0);
-
-        // Update the customerIdCounter to be at least as high as the maximum restored customer ID to avoid generating duplicate IDs for new customers.
-        customerIdCounter.updateAndGet(current -> Math.max(current, maxCustomerId));
-        System.out.printf("[CoffeeShop] Customer counter synced to %d.%n", maxCustomerId);
-    }
-
-    // ================================================================
     // ID Generation (Thread-Safe)
     // ================================================================
 
@@ -342,39 +295,6 @@ public class CoffeeShop {
      */
     public @NotNull String nextCustomerId() {
         return "CUST-" + customerIdCounter.incrementAndGet();
-    }
-
-    // ================================================================
-    // Private Helpers
-    // ================================================================
-
-    /**
-     * Synchronizes generated IDs with restored order IDs.
-     * This method extracts the numeric part of the order IDs and updates the orderIdCounter to ensure that new orders receive unique IDs that do not conflict with restored orders.
-     * @param restoredOrders the list of restored orders
-     */
-    private void syncOrderCounter(@NotNull List<Order> restoredOrders) {
-        int maxOrderId = restoredOrders.stream()
-                .map(Order::getOrderId)
-                .mapToInt(this::extractTrailingNumber)
-                .max()
-                .orElse(0);
-        // Update the orderIdCounter to be at least as high as the maximum restored order ID to avoid generating duplicate IDs for new orders.
-        orderIdCounter.updateAndGet(current -> Math.max(current, maxOrderId));
-    }
-
-    /**
-     * Extracts the trailing number from an ID string.
-     * This method uses a regular expression to find the numeric part at the end of the ID string.
-     * @param id the ID string to extract the number from
-     * @return the extracted number
-     */
-    private int extractTrailingNumber(@NotNull String id) {
-        Matcher matcher = TRAILING_NUMBER.matcher(id);
-        if (!matcher.find()) {
-            return 0;
-        }
-        return Integer.parseInt(matcher.group(1));
     }
 
     // ================================================================

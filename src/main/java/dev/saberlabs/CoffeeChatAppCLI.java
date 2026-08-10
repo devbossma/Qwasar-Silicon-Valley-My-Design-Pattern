@@ -116,7 +116,7 @@ public class CoffeeChatAppCLI {
         } finally {
             System.out.println("\nShutting down Coffee Chat...");
             shop.close();
-            DatabaseUtil.closeConnection();
+            DatabaseUtil.closeAllConnections();
             System.out.println("Goodbye!");
         }
     }

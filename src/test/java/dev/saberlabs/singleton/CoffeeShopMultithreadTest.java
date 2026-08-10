@@ -182,7 +182,7 @@ class CoffeeShopMultithreadTest {
         @DisplayName("enqueueOrder() throws on null order")
         void throwsOnNullOrder() {
             shop.open(5, 1);
-            assertThrows(IllegalArgumentException.class,
+            assertThrows(NullPointerException.class,
                     () -> shop.enqueueOrder(null));
         }
 

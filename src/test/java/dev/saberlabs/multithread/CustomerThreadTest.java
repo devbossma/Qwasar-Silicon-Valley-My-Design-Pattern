@@ -74,7 +74,7 @@ class CustomerThreadTest {
     @Test
     @DisplayName("Constructor rejects null customer")
     void constructorRejectsNullCustomer() {
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(NullPointerException.class, () ->
                 new CustomerThread(
                         null,
                         order -> {},
@@ -87,7 +87,7 @@ class CustomerThreadTest {
     @DisplayName("Constructor rejects null OrderHandler")
     void constructorRejectsNullOrderHandler() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(NullPointerException.class, () ->
                 new CustomerThread(
                         alice,
                         null,
@@ -100,7 +100,7 @@ class CustomerThreadTest {
     @DisplayName("Constructor rejects null OrderIdGenerator")
     void constructorRejectsNullIdGenerator() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(NullPointerException.class, () ->
                 new CustomerThread(
                         alice,
                         order -> {},
@@ -113,7 +113,7 @@ class CustomerThreadTest {
     @DisplayName("Constructor rejects null creators list")
     void constructorRejectsNullCreators() {
         Customer alice = createCustomer("CUST-1", "Alice");
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(NullPointerException.class, () ->
                 new CustomerThread(
                         alice,
                         order -> {},

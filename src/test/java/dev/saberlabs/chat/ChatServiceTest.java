@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @DisplayName("ChatService")
 class ChatServiceTest {
@@ -450,6 +451,67 @@ class ChatServiceTest {
 
             assertFalse(result);
             assertEquals(OrderStatus.READY, liveOrder.getStatus());
+        }
+    }
+
+    // ================================================================
+    // collectPaymentAndFulfill() — isolated from any concrete gateway via Mockito
+    // ================================================================
+
+    @Nested
+    @DisplayName("collectPaymentAndFulfill() with a mocked PaymentGateway")
+    class CollectPaymentWithMockedGatewayTests {
+
+        @Test
+        @DisplayName("calls the gateway with the exact order ID and price, and fulfills on success")
+        void callsGatewayAndFulfillsOnSuccess() {
+            ChatSession session = chatService.startChat(aliceUser);
+            ChatMessage placed = chatService.processCustomerInput(
+                    aliceUser, session, "order espresso");
+            // Deliberately not routed through sendOrderToKitchen() -- that hands the
+            // order to the real background Barista thread, which would race this
+            // test's manual setStatus(READY) below. The mock isolates us from that.
+
+            var liveOrder = shop.getOrders().stream()
+                    .filter(o -> o.getOrderId().equals(placed.orderId()))
+                    .findFirst().orElseThrow();
+            liveOrder.setStatus(OrderStatus.READY);
+            double expectedPrice = liveOrder.getFinalPrice();
+
+            PaymentGateway mockGateway = mock(PaymentGateway.class);
+            when(mockGateway.processPayment(placed.orderId(), expectedPrice)).thenReturn(true);
+
+            boolean result = chatService.collectPaymentAndFulfill(
+                    session, placed.orderId(), mockGateway);
+
+            assertTrue(result);
+            assertEquals(OrderStatus.FULFILLED, liveOrder.getStatus());
+            verify(mockGateway, times(1)).processPayment(placed.orderId(), expectedPrice);
+        }
+
+        @Test
+        @DisplayName("leaves the order READY and reports failure when the gateway declines")
+        void leavesOrderReadyWhenGatewayDeclines() {
+            ChatSession session = chatService.startChat(aliceUser);
+            ChatMessage placed = chatService.processCustomerInput(
+                    aliceUser, session, "order espresso");
+            // Same reasoning as above: skip sendOrderToKitchen() to avoid racing
+            // the real background Barista thread.
+
+            var liveOrder = shop.getOrders().stream()
+                    .filter(o -> o.getOrderId().equals(placed.orderId()))
+                    .findFirst().orElseThrow();
+            liveOrder.setStatus(OrderStatus.READY);
+
+            PaymentGateway mockGateway = mock(PaymentGateway.class);
+            when(mockGateway.processPayment(anyString(), anyDouble())).thenReturn(false);
+
+            boolean result = chatService.collectPaymentAndFulfill(
+                    session, placed.orderId(), mockGateway);
+
+            assertFalse(result);
+            assertEquals(OrderStatus.READY, liveOrder.getStatus());
+            verify(mockGateway, times(1)).processPayment(eq(placed.orderId()), anyDouble());
         }
     }
 

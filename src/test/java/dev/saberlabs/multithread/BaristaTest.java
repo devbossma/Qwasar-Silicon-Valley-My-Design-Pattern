@@ -36,14 +36,14 @@ class BaristaTest {
     @DisplayName("Constructor throws on null name")
     void constructorRejectsNullName() {
         OrderQueue queue = new OrderQueue(5);
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(NullPointerException.class,
                 () -> new Barista(null, queue));
     }
 
     @Test
     @DisplayName("Constructor throws on null queue")
     void constructorRejectsNullQueue() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(NullPointerException.class,
                 () -> new Barista("Barista-1", null));
     }
 

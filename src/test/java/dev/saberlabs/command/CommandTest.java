@@ -11,6 +11,7 @@ import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Espresso;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -230,5 +232,59 @@ class CommandTest {
         assertEquals(OrderStatus.READY, aliceOrder.getStatus());
         assertEquals(OrderStatus.READY, bobOrder.getStatus());
         assertEquals(4, invoker.getCommandHistory().size());
+    }
+
+    // ================================================================
+    // Order.restoreStatus() — used when reconstructing already-processed
+    // orders from persistence, deliberately bypassing setStatus()'s
+    // Observer notification and loyalty-increment side effects.
+    // ================================================================
+
+    @Test
+    @DisplayName("restoreStatus sets the status directly without notifying observers")
+    void restoreStatusDoesNotNotifyObservers() {
+        Customer alice = new Customer("C001", "Alice");
+        Order order = new Order(alice, new Espresso(), 28);
+
+        AtomicBoolean notified = new AtomicBoolean(false);
+        OrderObserver observer = (observedOrder, status) -> notified.set(true);
+        CoffeeShop.getInstance().registerObserver(observer);
+
+        order.restoreStatus(OrderStatus.READY);
+
+        assertEquals(OrderStatus.READY, order.getStatus());
+        assertFalse(notified.get(), "restoreStatus should not trigger Observer notifications");
+
+        CoffeeShop.getInstance().removeObserver(observer);
+    }
+
+    @Test
+    @DisplayName("setStatus, by contrast, does notify observers")
+    void setStatusDoesNotifyObservers() {
+        Customer alice = new Customer("C001", "Alice");
+        Order order = new Order(alice, new Espresso(), 29);
+
+        AtomicBoolean notified = new AtomicBoolean(false);
+        OrderObserver observer = (observedOrder, status) -> notified.set(true);
+        CoffeeShop.getInstance().registerObserver(observer);
+
+        order.setStatus(OrderStatus.READY);
+
+        assertTrue(notified.get(), "setStatus should trigger Observer notifications");
+
+        CoffeeShop.getInstance().removeObserver(observer);
+    }
+
+    @Test
+    @DisplayName("restoreStatus(FULFILLED) marks the order fulfilled without incrementing loyalty")
+    void restoreStatusFulfilledDoesNotIncrementLoyalty() {
+        Customer alice = new Customer("C001", "Alice");
+        Order order = new Order(alice, new Espresso(), 30);
+
+        order.restoreStatus(OrderStatus.FULFILLED);
+
+        assertEquals(OrderStatus.FULFILLED, order.getStatus());
+        assertEquals(0, alice.getTotalOrders(),
+                "restoreStatus should not increment loyalty — it's reconstructing already-counted history");
     }
 }

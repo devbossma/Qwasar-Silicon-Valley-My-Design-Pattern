@@ -5,6 +5,7 @@ import dev.saberlabs.models.Cappuccino;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.singleton.CoffeeShop;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,10 @@ public class OrderQueueTest {
     @BeforeEach
     void setUp() {
         CoffeeShop.getInstance().clearOrders();
+    }
+    @AfterEach
+    void tearDown() {
+        CoffeeShop.getInstance().close();
     }
 
     // ------------------------------------------------------------------------
@@ -75,7 +80,7 @@ public class OrderQueueTest {
     @DisplayName("Enqueue null throws IllegalArgumentException")
     void testEnqueueNullThrowsException(){
         OrderQueue orderQueue = new OrderQueue(5);
-        assertThrows(IllegalArgumentException.class, () -> orderQueue.enqueue(null));
+        assertThrows(NullPointerException.class, () -> orderQueue.enqueue(null));
     }
 
     @Test
@@ -376,6 +381,39 @@ public class OrderQueueTest {
         assertEquals(totalOperations, produced.get(), "Produced count mismatch");
         assertEquals(totalOperations, consumed.get(), "Consumed count mismatch");
         assertTrue(queue.isEmpty(), "Queue not empty after all operations");
+    }
+
+    @Test
+    @DisplayName("The getCapacity() returns the maximum number of orders the queue can hold")
+    void testGetCapacity() {
+        assertNull(CoffeeShop.getInstance().getOrderQueue());
+        CoffeeShop.getInstance().open(5, 2);
+        assertNotNull(CoffeeShop.getInstance().getOrderQueue());
+        assertEquals(5, CoffeeShop.getInstance().getOrderQueue().getCapacity());
+    }
+
+    @Test
+    @DisplayName("The isFull() method returns true when the queue is at capacity and false otherwise")
+    void testisFull() throws InterruptedException {
+        OrderQueue orderQueue = new OrderQueue(2);
+
+        Customer custom_1 = new Customer("CUST-1", "Yassine");
+        Customer custom_2 = new Customer("CUST-2", "Ahmed");
+        Customer custom_3 = new Customer("CUST-3", "Karim");
+
+        Order order_1 = new Order(custom_1, new Cappuccino(), "ORD-1");
+        Order order_2 = new Order(custom_2, new Cappuccino(), "ORD-2");
+        Order order_3 = new Order(custom_3, new Cappuccino(), "ORD-3");
+
+        orderQueue.enqueue(order_1);
+        orderQueue.enqueue(order_2);
+
+        assertTrue(orderQueue.isFull(), "Queue should be full");
+
+        orderQueue.dequeue();
+        orderQueue.dequeue();
+
+        assertFalse(orderQueue.isFull(), "Queue should not be full");
     }
 
 }

@@ -87,6 +87,40 @@ class CommandTest {
     }
 
     @Test
+    @DisplayName("PayOrderCommand.isPaid() reflects the gateway's payment status after execute()")
+    void payOrderCommandIsPaid() {
+        Customer alice = new Customer("C001", "Alice");
+        StripePaymentService stripeService = new StripePaymentService(
+                "1234567890123456", "Bob Smith", "12", "2028", "456");
+        PaymentGateway alicePayment = new StripeAdapter(stripeService);
+        Order order = new Order(alice, new Espresso(), 31);
+        PayOrderCommand payCommand = new PayOrderCommand(order, alicePayment);
+        OrderInvoker invoker = new OrderInvoker();
+
+        invoker.executeCommand(new PlaceOrderCommand(order));
+        invoker.executeCommand(payCommand);
+
+        assertTrue(payCommand.isPaid());
+    }
+
+    @Test
+    @DisplayName("undo PayOrderCommand issues a refund message without reverting order status")
+    void undoPayOrderCommand() {
+        Customer alice = new Customer("C001", "Alice");
+        StripePaymentService stripeService = new StripePaymentService(
+                "1234567890123456", "Bob Smith", "12", "2028", "456");
+        PaymentGateway alicePayment = new StripeAdapter(stripeService);
+        Order order = new Order(alice, new Espresso(), 32);
+        OrderInvoker invoker = new OrderInvoker();
+
+        invoker.executeCommand(new PlaceOrderCommand(order));
+        invoker.executeCommand(new PayOrderCommand(order, alicePayment));
+
+        assertDoesNotThrow(invoker::undoLastCommand);
+        assertEquals(OrderStatus.PLACED, order.getStatus());
+    }
+
+    @Test
     @DisplayName("undo PlaceOrderCommand sets status to CANCELLED")
     void undoPlaceOrder() {
         Customer alice = new Customer("C001", "Alice");

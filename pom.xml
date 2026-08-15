@@ -88,11 +88,11 @@
 
     <build>
         <plugins>
-<!--            <plugin>-->
-<!--                <groupId>org.apache.maven.plugins</groupId>-->
-<!--                <artifactId>maven-surefire-plugin</artifactId>-->
-<!--                <version>3.2.5</version>-->
-<!--            </plugin>-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
@@ -124,6 +124,9 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.13</version>
+                <configuration>
+                    <outputDirectory>${project.build.directory}/jacoco</outputDirectory>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -137,6 +140,49 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-check</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Class-file patterns excluded from analysis entirely (Ant-style,
+                                 slash-separated). NOTE: Rule-level <excludes> only applies when
+                                 <element> is CLASS, so for a PACKAGE-element rule the exclusion
+                                 must live here instead. -->
+                            <excludes>
+                                <!-- App entry points and JavaFX UI/wiring — not exercised by unit tests -->
+                                <exclude>dev/saberlabs/CoffeeShopApp.class</exclude>
+                                <exclude>dev/saberlabs/CoffeeChatAppCLI.class</exclude>
+                                <exclude>dev/saberlabs/CoffeeChatAppFX.class</exclude>
+                                <exclude>dev/saberlabs/views/**</exclude>
+                                <exclude>dev/saberlabs/fx/**</exclude>
+                                <!-- Leftover Phase-0 design-patterns demo mains -->
+                                <exclude>dev/saberlabs/adapter/AdapterDemo.class</exclude>
+                                <exclude>dev/saberlabs/command/CommandDemo.class</exclude>
+                                <exclude>dev/saberlabs/db/DBDemo.class</exclude>
+                                <exclude>dev/saberlabs/decorator/DecoratorDemo.class</exclude>
+                                <exclude>dev/saberlabs/facade/FacadeDemo.class</exclude>
+                                <exclude>dev/saberlabs/factory/FactoryMethodDemo.class</exclude>
+                                <exclude>dev/saberlabs/observer/ObserverDemo.class</exclude>
+                                <exclude>dev/saberlabs/prototype/PrototypeDemo.class</exclude>
+                                <exclude>dev/saberlabs/singleton/SingletonDemo.class</exclude>
+                                <exclude>dev/saberlabs/strategy/StrategyDemo.class</exclude>
+                            </excludes>
+                            <rules>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

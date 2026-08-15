@@ -2,6 +2,7 @@ package dev.saberlabs.decorator;
 
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Espresso;
+import dev.saberlabs.template.EspressoPreparation;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,5 +46,12 @@ class DecoratorTest {
         assertTrue(c.getDescription().contains("Sugar"));
         assertTrue(c.getDescription().contains("Milk"));
         assertTrue(c.getDescription().contains("Whipped Cream"));
+    }
+
+    @Test
+    @DisplayName("a decorator delegates getPreparation() to the wrapped coffee")
+    void delegatesPreparation() {
+        Coffee c = new MilkDecorator(new Espresso());
+        assertInstanceOf(EspressoPreparation.class, c.getPreparation());
     }
 }

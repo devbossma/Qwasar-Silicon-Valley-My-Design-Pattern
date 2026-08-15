@@ -23,6 +23,7 @@ class StrategyTest {
         RegularPricing pricing = new RegularPricing();
         double finalPrice = pricing.calculatePrice(coffee.getCost());
         assertEquals(coffee.getCost(), finalPrice, 0.001);
+        assertEquals("Regular (no discount)", pricing.getDescription());
     }
 
     @Test
@@ -32,6 +33,7 @@ class StrategyTest {
         SilverMemberPricing pricing = new SilverMemberPricing();
         double finalPrice = pricing.calculatePrice(coffee.getCost());
         assertEquals(coffee.getCost() * 0.90, finalPrice, 0.001);
+        assertEquals("Silver Member (10% off)", pricing.getDescription());
     }
 
     @Test
@@ -41,6 +43,7 @@ class StrategyTest {
         GoldMemberPricing pricing = new GoldMemberPricing();
         double finalPrice = pricing.calculatePrice(coffee.getCost());
         assertEquals(coffee.getCost() * 0.80, finalPrice, 0.001);
+        assertEquals("Gold Member (20% off)", pricing.getDescription());
     }
 
     @Test

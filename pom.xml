@@ -158,17 +158,6 @@
                                 <exclude>dev/saberlabs/CoffeeChatAppFX.class</exclude>
                                 <exclude>dev/saberlabs/views/**</exclude>
                                 <exclude>dev/saberlabs/fx/**</exclude>
-                                <!-- Leftover Phase-0 design-patterns demo mains -->
-                                <exclude>dev/saberlabs/adapter/AdapterDemo.class</exclude>
-                                <exclude>dev/saberlabs/command/CommandDemo.class</exclude>
-                                <exclude>dev/saberlabs/db/DBDemo.class</exclude>
-                                <exclude>dev/saberlabs/decorator/DecoratorDemo.class</exclude>
-                                <exclude>dev/saberlabs/facade/FacadeDemo.class</exclude>
-                                <exclude>dev/saberlabs/factory/FactoryMethodDemo.class</exclude>
-                                <exclude>dev/saberlabs/observer/ObserverDemo.class</exclude>
-                                <exclude>dev/saberlabs/prototype/PrototypeDemo.class</exclude>
-                                <exclude>dev/saberlabs/singleton/SingletonDemo.class</exclude>
-                                <exclude>dev/saberlabs/strategy/StrategyDemo.class</exclude>
                             </excludes>
                             <rules>
                                 <rule>

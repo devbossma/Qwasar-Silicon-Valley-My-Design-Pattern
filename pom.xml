@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>dev.saberlabs</groupId>
-    <artifactId>MyDesignPattern</artifactId>
+    <artifactId>ItWorksOnMyMachine</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>Coffee Shop</name>
-    <description>A coffee shop simulation demonstrating 10 design patterns + multithreading + chat ui interface</description>
+    <name>It Works On My Machine</name>
+    <description>Coffee Chat application (design patterns + multithreading + JDBC chat + JavaFX UI) extended with a JUnit 5 + Mockito test suite and JaCoCo coverage enforcement</description>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>

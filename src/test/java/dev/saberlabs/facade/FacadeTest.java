@@ -16,11 +16,13 @@ import dev.saberlabs.singleton.CoffeeShop;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @DisplayName("Facade Pattern")
 class FacadeTest {
@@ -208,5 +210,52 @@ class FacadeTest {
         assertEquals(4.75, bobOrder.getFinalPrice(), 0.001);
         assertEquals(aliceFancy.getCoffee().getDescription(), bobOrder.getCoffee().getDescription());
         assertSame(bob, bobOrder.getCustomer());
+    }
+
+    // ================================================================
+    // processOrder() with a mocked PaymentGateway — isolates the Facade's
+    // own orchestration order (Prepare -> Fulfill -> Pay) from any real
+    // gateway, deliberately supplementing (not replacing) the real-adapter
+    // tests above.
+    // ================================================================
+
+    @Nested
+    @DisplayName("processOrder() with a mocked PaymentGateway")
+    class ProcessOrderWithMockedGatewayTests {
+
+        @Test
+        @DisplayName("a declined payment still leaves fulfillment and loyalty applied, since Pay runs after Fulfill")
+        void declinedPaymentDoesNotUndoFulfillment() {
+            PaymentGateway mockGateway = mock(PaymentGateway.class);
+            when(mockGateway.processPayment(anyString(), anyDouble())).thenReturn(false);
+            CoffeeShopFacade mockedFacade = new CoffeeShopFacade(mockGateway);
+            mockedFacade.registerCustomer(alice);
+
+            Order order = mockedFacade.placeOrder(alice, new EspressoCreator());
+
+            assertThrows(RuntimeException.class, () -> mockedFacade.processOrder(order));
+
+            assertEquals(OrderStatus.FULFILLED, order.getStatus());
+            assertEquals(1, alice.getTotalOrders());
+            // Prepare + Fulfill made it into history; Pay threw before being recorded
+            assertEquals(3, mockedFacade.getInvoker().getCommandHistory().size());
+            verify(mockGateway).processPayment(eq("ORDER-" + order.getOrderId()), eq(order.getFinalPrice()));
+        }
+
+        @Test
+        @DisplayName("an accepted payment completes processOrder without throwing")
+        void acceptedPaymentCompletesProcessing() {
+            PaymentGateway mockGateway = mock(PaymentGateway.class);
+            when(mockGateway.processPayment(anyString(), anyDouble())).thenReturn(true);
+            CoffeeShopFacade mockedFacade = new CoffeeShopFacade(mockGateway);
+            mockedFacade.registerCustomer(alice);
+
+            Order order = mockedFacade.placeOrder(alice, new EspressoCreator());
+
+            assertDoesNotThrow(() -> mockedFacade.processOrder(order));
+
+            assertEquals(OrderStatus.FULFILLED, order.getStatus());
+            assertEquals(4, mockedFacade.getInvoker().getCommandHistory().size());
+        }
     }
 }

@@ -31,7 +31,6 @@ target/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
-/test-reports/
 
 ### VS Code ###
 .vscode/
@@ -41,3 +40,6 @@ build/
 
 ### Data ###
 data
+
+### Docs ###
+docs/images/coverage/raw/

@@ -61,12 +61,84 @@ layer on top of it:
   design-patterns-only project (its own separate repository) — dead weight that
   existed only to drag down coverage numbers with unreachable `main()` methods. They
   added nothing this phase's tests needed to prove, so they're gone.
-- **361 tests, 0 failures**, covering: order processing (`OrderQueueTest`,
-  `CommandTest`), chat (`ChatServiceTest`, `BaristaQueueTest`,
-  `BaristaQueueRestoreTest`), database interactions (`DatabaseUtilTest` and ten
-  `Sqlite*`/`InMemory*` repository test classes), the `CoffeeShop` singleton lifecycle
-  (`SingletonTest`, `CoffeeShopMultithreadTest`), every GoF pattern in isolation, and
-  the JavaFX controllers via TestFX.
+- **375 tests, 0 failures**, covering: order processing (`OrderQueueTest`,
+  `CommandTest`), chat (`ChatServiceTest`, `ChatNotificationServiceTest`,
+  `BaristaQueueTest`, `BaristaQueueRestoreTest`), database interactions
+  (`DatabaseUtilTest` and ten `Sqlite*`/`InMemory*` repository test classes), the
+  `CoffeeShop` singleton lifecycle (`SingletonTest`, `CoffeeShopMultithreadTest`),
+  every GoF pattern in isolation, and the JavaFX controllers via TestFX.
+
+## Testing Best Practices
+The assignment asked for more than a test count — it asked for *meaningful* tests
+built on specific best practices. Here's how each one shows up concretely in this
+codebase, not just as a claim:
+
+### Isolation
+Every test is independent and repeatable in any order. Two isolation strategies are
+used deliberately, not interchangeably:
+- **Real objects for cheap, fast, in-process collaborators.** `Sqlite*RepositoryTest`
+  classes run against a real temp-file SQLite database (`DatabaseUtil.setDbPathForTesting()`)
+  instead of mocking JDBC — mocking `Connection`/`ResultSet` for an embedded driver
+  would be brittle and prove nothing about whether the SQL actually works.
+  `InMemory*RepositoryTest` classes and `AuthServiceTest` use the codebase's own
+  hand-rolled `InMemory*` fakes for the same reason: they're fast, deterministic, and
+  exercising the real object's real logic is *more* valuable than mocking it.
+- **Mockito mocks for genuine external collaborators the unit under test doesn't own.**
+  `ChatServiceTest` mocks `PaymentGateway` to isolate payment-collection logic from any
+  concrete adapter; `PersistingOrderObserverTest` mocks `ChatOrderRepository` and
+  `ChatNotificationService`; `ChatNotificationServiceTest` mocks
+  `ChatNotificationRepository` and `NotificationObserver`. In each case the class under
+  test *depends on* the interface but doesn't *own* the implementation — the textbook
+  case for a mock, used deliberately rather than as a default everywhere.
+
+### Readability
+Every test has a `@DisplayName` describing *behavior*, not implementation
+(`"restoreStatus should not trigger Observer notifications"`, not `testRestoreStatus2`),
+grouped into `@Nested` classes per method/scenario (see `CommandTest`, `ChatServiceTest`,
+`SqliteChatOrderRepositoryTest`) so a failing test's location alone tells you what broke
+without reading the test body.
+
+### Meaningful coverage, not just a percentage
+The JaCoCo gate (below) enforces a *floor*, not a target to game. It deliberately
+excludes JavaFX UI/wiring and app entry points rather than writing hollow tests just to
+move a number, and the tests written to close real gaps assert actual behavior and
+edge cases (empty results, not-found branches, upsert-vs-insert paths, observer
+broadcast/removal) rather than just "call the method so the line lights up green."
+
+### Avoid hardcoding
+Fixed values that mean something are named constants, not repeated magic values —
+e.g. `DatabaseUtilTest`'s `EXPECTED_BUSY_TIMEOUT_MS` and `EXPECTED_TABLES`, so the
+*meaning* of `5000` or the table list is stated once and reused, and a future schema
+change only needs updating in one place.
+
+### Setup and teardown
+`@BeforeEach`/`@AfterEach` reset shared/static state before and after every test so
+nothing leaks between them: `DatabaseUtil.closeAllConnections()` plus a fresh temp DB
+file per test in every `Sqlite*RepositoryTest`, `CoffeeShop.getInstance().clearOrders()`
+before command/facade tests, and `shop.close()` after any test that opens baristas.
+
+## About JaCoCo
+[JaCoCo](https://www.jacoco.org/jacoco/) (**Ja**va **Co**de **Co**verage) is a free,
+open-source library that instruments compiled bytecode at test-run time to record
+which lines, branches, and methods actually executed. It's wired into this project's
+`pom.xml` as three `jacoco-maven-plugin` executions:
+1. **`prepare-agent`** — attaches the coverage agent before tests run.
+2. **`report`** — after `mvn test`, writes human/tool-readable reports (HTML, XML, CSV)
+   to `target/site/jacoco/`.
+3. **`jacoco-check`** — on `mvn verify`, fails the build if any package's line-coverage
+   ratio falls below **80%**, with a configured `<excludes>` list so JavaFX UI/wiring
+   code and app entry points don't count against the gate (see [Enforcing the coverage
+   gate](#enforcing-the-coverage-gate) below).
+
+## About Mockito
+[Mockito](https://site.mockito.org/) is a mocking framework for Java: `mock(SomeInterface.class)`
+creates a fake implementation you control entirely in the test. `when(mock.method(...)).thenReturn(...)`
+stubs its return value; `verify(mock).method(...)` asserts it was actually called, with
+what arguments, how many times. This project uses it for exactly one purpose — isolating
+a unit from a *collaborator it depends on but doesn't own* (a payment gateway, a
+notification repository) — never as a blanket replacement for the existing `InMemory*`
+fake pattern, which stays in place wherever a real, fast, in-process object is more
+informative than a mock of one.
 
 ## Installation
 Requires **JDK 25+** and **Maven**. Same repository as the Coffee Chat phase — no new
@@ -99,7 +171,7 @@ mvn verify
 Runs the full suite **and** fails the build if any (non-excluded) package falls below
 80% line coverage:
 ```bash
-[INFO] Tests run: 361, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 375, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 If a package fails the gate, the console prints exactly which one and by how much:
@@ -114,18 +186,53 @@ If a package fails the gate, the console prints exactly which one and by how muc
 with live coverage highlighting:
 
 #### For IntelliJ
-Right-click a test class/package (or use the coverage icon next to the run button) →
-**Run ... with Coverage**. Configure the engine (IntelliJ's own or JaCoCo) under
-**Settings → Build, Execution, Deployment → Coverage**. Results show as inline
-green/red/yellow gutter highlighting plus a **Coverage** tool window.
+1. Right-click a test class/package (or use the coverage icon next to the run button)
+- Configure the engine (IntelliJ's own or JaCoCo) under **Settings → Build, Execution, Deployment → Coverage**.
+
+![Configure Coverage Engine](docs/images/coverage/intellij-0-configure-coverage-engine.png)
+
+-  **Run ... with Coverage**. wright-click a test class/package → **More Run/Debug → 'Run CommandTest' With Coverage** or use the coverage icon next to the run button.
+   
+
+   ![Run with Coverage context menu](docs/images/coverage/intellij-1-run-with-coverage.png)
+
+2. Results open in the **Coverage** tool window with per-package/class percentages.
+
+   ![Coverage tool window](docs/images/coverage/intellij-2-coverage-tool-window.png)
+
+3. Open any covered source file to see inline green/red/yellow gutter highlighting.
+
+   ![Gutter highlighting](docs/images/coverage/intellij-3-gutter-highlighting.png)
 
 #### For Eclipse
-Install the **EclEmma** plugin (built on JaCoCo) via the Marketplace, then right-click
-a test class/package → **Coverage As → JUnit Test**.
+1. Install the **EclEmma** plugin (built on JaCoCo) via **Help → Eclipse Marketplace**.
+
+   ![Installing EclEmma from the Marketplace](docs/images/coverage/eclipse-1-install-eclemma.png)
+
+2. Right-click a test class/package → **Coverage As → JUnit Test**.
+
+   ![Coverage As JUnit Test](docs/images/coverage/eclipse-2-coverage-as-junit-test.png)
+
+3. Results appear in the **Coverage** view, with matching gutter highlighting in the editor.
+
+   ![Coverage view results](docs/images/coverage/eclipse-3-coverage-view-results.png)
 
 #### For VS Code
-Use the Java Extension Pack's Testing sidebar (**Run Tests with Coverage**), or the
-**Coverage Gutters** extension pointed at the generated `target/site/jacoco/jacoco.xml`.
+1. Install the **Coverage Gutters** extension from the Extensions marketplace (or use
+   the Java Extension Pack's Testing sidebar if it offers **Run Tests with Coverage**
+   directly).
+
+   ![Installing Coverage Gutters](docs/images/coverage/vscode-1-install-coverage-gutters.png)
+
+2. Run `mvn test` to generate `target/site/jacoco/jacoco.xml`, then run
+   **Coverage Gutters: Display Coverage** from the Command Palette.
+   **Right-click a test class/package → **Run Tests with Coverage**.
+
+   ![Display Coverage command](docs/images/coverage/vscode-2-display-coverage-command.png)
+
+3. Gutter highlighting appears directly in the editor next to the line numbers.
+
+   ![Gutter highlighting result](docs/images/coverage/vscode-3-gutter-highlighting-result.png)
 
 ### The Core Team
 

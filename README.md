@@ -12,15 +12,20 @@ measured, enforced code-coverage floor. Each phase had its own core challenge:
 - **Design Patterns phase**  implement all 10 assigned GoF patterns *correctly*, not
   as superficial approximations, and make them cooperate inside one cohesive
   application rather than existing as isolated textbook examples.
+  see [`DESIGN-PATTERNS-README.md`](docs/DESIGN-PATTERNS-README.md) for full details.
+
 - **Multithreading phase**  extend the same application so multiple customers can
   place orders concurrently while baristas prepare them in the background, using a
   thread-safe order queue (the classic producer-consumer problem) without corrupting
   shared state like loyalty tiers or order counters.
+  see [`MULTITHREADING-README.md`](docs/MULTITHREADING-README.md) for full details.
+
 - **Coffee Chat phase**  extend it again with a real chat feature — a CLI chat app
   (`CoffeeChatAppCLI`) where orders are placed *through conversation* and paid for as
   an explicit step, persisted via a handwritten JDBC layer, then wrapped in a JavaFX
   desktop UI (`CoffeeChatAppFX`) with chat bubbles, image sharing, and multi-window
-  support. Full details in [`COFFEE-CHAT-README.md`](COFFEE-CHAT-README.md).
+  support. Full details in [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md).
+
 - **It Works On My Machine phase (this project)**  stop trusting that the previous
   three phases still work just because they compile. Write real unit tests across
   order processing, chat, database interactions, and the `CoffeeShop` singleton
@@ -32,7 +37,9 @@ measured, enforced code-coverage floor. Each phase had its own core challenge:
 ## Description
 The application itself is unchanged — every pattern, the multithreaded order queue,
 and the full chat + JDBC + JavaFX stack from the previous phases are exactly as
-described in their own READMEs. What this phase adds is a testing and quality-gate
+described in their own READMEs mentioned in this project documentation. 
+
+What this phase adds is a testing and quality-gate
 layer on top of it:
 
 - **JUnit 5** was already integrated; this phase closed the *real* gaps rather than
@@ -68,12 +75,12 @@ layer on top of it:
   `CoffeeShop` singleton lifecycle (`SingletonTest`, `CoffeeShopMultithreadTest`),
   every GoF pattern in isolation, and the JavaFX controllers via TestFX.
 
-## Testing Best Practices
+### Testing Best Practices
 The assignment asked for more than a test count — it asked for *meaningful* tests
 built on specific best practices. Here's how each one shows up concretely in this
 codebase, not just as a claim:
 
-### Isolation
+#### Isolation
 Every test is independent and repeatable in any order. Two isolation strategies are
 used deliberately, not interchangeably:
 - **Real objects for cheap, fast, in-process collaborators.** `Sqlite*RepositoryTest`
@@ -91,33 +98,33 @@ used deliberately, not interchangeably:
   test *depends on* the interface but doesn't *own* the implementation — the textbook
   case for a mock, used deliberately rather than as a default everywhere.
 
-### Readability
+#### Readability
 Every test has a `@DisplayName` describing *behavior*, not implementation
 (`"restoreStatus should not trigger Observer notifications"`, not `testRestoreStatus2`),
 grouped into `@Nested` classes per method/scenario (see `CommandTest`, `ChatServiceTest`,
 `SqliteChatOrderRepositoryTest`) so a failing test's location alone tells you what broke
 without reading the test body.
 
-### Meaningful coverage, not just a percentage
+#### Meaningful coverage, not just a percentage
 The JaCoCo gate (below) enforces a *floor*, not a target to game. It deliberately
 excludes JavaFX UI/wiring and app entry points rather than writing hollow tests just to
 move a number, and the tests written to close real gaps assert actual behavior and
 edge cases (empty results, not-found branches, upsert-vs-insert paths, observer
 broadcast/removal) rather than just "call the method so the line lights up green."
 
-### Avoid hardcoding
+#### Avoid hardcoding
 Fixed values that mean something are named constants, not repeated magic values —
 e.g. `DatabaseUtilTest`'s `EXPECTED_BUSY_TIMEOUT_MS` and `EXPECTED_TABLES`, so the
 *meaning* of `5000` or the table list is stated once and reused, and a future schema
 change only needs updating in one place.
 
-### Setup and teardown
+#### Setup and teardown
 `@BeforeEach`/`@AfterEach` reset shared/static state before and after every test so
 nothing leaks between them: `DatabaseUtil.closeAllConnections()` plus a fresh temp DB
 file per test in every `Sqlite*RepositoryTest`, `CoffeeShop.getInstance().clearOrders()`
 before command/facade tests, and `shop.close()` after any test that opens baristas.
 
-## About JaCoCo
+### About JaCoCo
 [JaCoCo](https://www.jacoco.org/jacoco/) (**Ja**va **Co**de **Co**verage) is a free,
 open-source library that instruments compiled bytecode at test-run time to record
 which lines, branches, and methods actually executed. It's wired into this project's
@@ -130,7 +137,7 @@ which lines, branches, and methods actually executed. It's wired into this proje
    code and app entry points don't count against the gate (see [Enforcing the coverage
    gate](#enforcing-the-coverage-gate) below).
 
-## About Mockito
+### About Mockito
 [Mockito](https://site.mockito.org/) is a mocking framework for Java: `mock(SomeInterface.class)`
 creates a fake implementation you control entirely in the test. `when(mock.method(...)).thenReturn(...)`
 stubs its return value; `verify(mock).method(...)` asserts it was actually called, with
@@ -154,7 +161,7 @@ mvn clean install
 ## Usage
 ### Running the application
 The app itself runs exactly as in the Coffee Chat phase — see
-[`COFFEE-CHAT-README.md`](COFFEE-CHAT-README.md) for the full console (`CoffeeChatAppCLI`)
+[`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md) for the full console (`CoffeeChatAppCLI`)
 and desktop (`CoffeeChatAppFX`) walkthroughs.
 
 ### Running the tests
@@ -171,6 +178,8 @@ mvn verify
 Runs the full suite **and** fails the build if any (non-excluded) package falls below
 80% line coverage:
 ```bash
+[INFO] Results:
+[INFO] 
 [INFO] Tests run: 375, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
@@ -182,21 +191,24 @@ If a package fails the gate, the console prints exactly which one and by how muc
 ### Measuring Test Coverage
 `mvn test`/`mvn verify` already produce IDE-agnostic reports at
 `target/site/jacoco/index.html` (open directly in a browser), `jacoco.xml`, and
-`jacoco.csv` — usable regardless of editor. Each IDE also has its own way to run tests
+`jacoco.csv` — usable regardless of editor. 
+
+Each IDE also has its own way to run tests
 with live coverage highlighting:
 
 #### For IntelliJ
-1. Right-click a test class/package (or use the coverage icon next to the run button)
-- Configure the engine (IntelliJ's own or JaCoCo) under **Settings → Build, Execution, Deployment → Coverage**.
+1. Configuring and running coverage is a two-step process:
+- Configure the engine (IntelliJ's own or JaCoCo) under **Settings → Build, Execution, Deployment → Java Coverage**.
 
-![Configure Coverage Engine](docs/images/coverage/intellij-0-configure-coverage-engine.png)
+ ![Configure Coverage Engine](docs/images/coverage/intellij-0-configure-coverage-engine.png)
 
 -  **Run ... with Coverage**. wright-click a test class/package → **More Run/Debug → 'Run CommandTest' With Coverage** or use the coverage icon next to the run button.
    
 
    ![Run with Coverage context menu](docs/images/coverage/intellij-1-run-with-coverage.png)
 
-2. Results open in the **Coverage** tool window with per-package/class percentages.
+2. Coverage Results:
+  - Open in the **Coverage** tool window with per-package/class percentages.
 
    ![Coverage tool window](docs/images/coverage/intellij-2-coverage-tool-window.png)
 

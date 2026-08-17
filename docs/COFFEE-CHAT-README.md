@@ -363,7 +363,7 @@ but first you need to uncomment the `CoffeeChatAppFX.main(args);` line in `Coffe
 - Emojies can be inserted into chat messages using the emoji picker, and images can be shared as thumbnails in the chat interface.
 
 ### Testing
-- Unit tests are located in the `src/test/java` directory. Run them with:
+- Unit tests are located in the `../src/test/java` directory. Run them with:
 ```bash
 mvn test
 ```

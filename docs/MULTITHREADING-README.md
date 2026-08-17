@@ -72,10 +72,10 @@ Expected output:
 ```
 
 Individual test suites:
-- **Multithreading tests**: `src/test/java/dev/saberlabs/multithread/` -- OrderQueue, Barista, CustomerThread
+- **Multithreading tests**: `../src/test/java/dev/saberlabs/multithread` -- OrderQueue, Barista, CustomerThread
 - **Repository tests**: `src/test/java/dev/saberlabs/repository/` -- File-backed and in-memory repositories
 - **Persistence tests**: `src/test/java/dev/saberlabs/persistence/` -- Snapshot mappers and facade
-- **Integration tests**: `src/test/java/dev/saberlabs/integration/` -- Cross-pattern scenarios with threads
+- **Integration tests**: `../src/test/java/dev/saberlabs/integration` -- Cross-pattern scenarios with threads
 
 ---
 
@@ -91,7 +91,7 @@ The multithreading, repository, and persistence packages are self-documented:
 
 To read package documentation: `src/main/java/dev/saberlabs/<package>/doc.md`
 
-For example: [`multithread/doc.md`](src/main/java/dev/saberlabs/multithread/doc.md) explains the Producer-Consumer pattern, thread-safe queue implementation, barista consumer loops, and graceful shutdown semantics.
+For example: [`multithread/doc.md`](../src/main/java/dev/saberlabs/multithread/doc.md) explains the Producer-Consumer pattern, thread-safe queue implementation, barista consumer loops, and graceful shutdown semantics.
 
 Key source files with extensive Javadoc:
 - `OrderQueue.java` -- thread-safe bounded queue with fair ReentrantLock and two Conditions
@@ -499,7 +499,7 @@ Each package has focused unit tests:
 
 ### Integration Tests (Realistic Scenarios)
 
-Under `src/test/java/dev/saberlabs/integration/`:
+Under `../src/test/java/dev/saberlabs/integration`:
 
 - **`MultithreadIntegrationTest.java`** -- multiple customers + multiple baristas + observer notifications in a realistic flow
 - **`PersistenceIntegrationTest.java`** -- full scenario: place orders → save state → clear shop → restore → verify all data and behavior
@@ -555,7 +555,7 @@ If threads hang, check:
 ### Data not persisting
 
 Check that:
-- `data/` directory is writable
+- `../data` directory is writable
 - `CoffeeShopPersistenceFacade(Path.of("data"))` points to the correct directory
 - JSON files are not corrupted (use `PersistenceDemo` to test round-trip)
 

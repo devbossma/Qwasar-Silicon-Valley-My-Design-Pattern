@@ -33,7 +33,7 @@ Every pattern is self-documented inside its own package under `src/main/java/dev
 | All `.java` sources | Class-level Javadoc on every key type, cross-linked with `{@link}` references to related pattern classes |
 
 To read a pattern's full documentation, open `src/main/java/dev/saberlabs/<pattern>/doc.md`.  
-For example: [`facade/doc.md`](src/main/java/dev/saberlabs/facade/doc.md) explains how the Facade coordinates all 9 other patterns in a single `placeOrder → processOrder` call.
+For example: [`facade/doc.md`](../src/main/java/dev/saberlabs/facade/doc.md) explains how the Facade coordinates all 9 other patterns in a single `placeOrder → processOrder` call.
 
 ---
 

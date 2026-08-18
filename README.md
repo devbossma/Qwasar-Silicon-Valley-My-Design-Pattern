@@ -1,11 +1,12 @@
-# Welcome to It Works On My Machine
+# Welcome to Package It
 ***
 
 ## Task
-A coffee shop simulation started as a pure design-patterns exercise, then grew into a
+A coffee shop simulation started as a pure design-patterns exercise, grew into a
 concurrent order-processing system, then into a full chat-based ordering application
-with a JavaFX desktop client, and now gets a real safety net: automated tests and a
-measured, enforced code-coverage floor. Each phase had its own core challenge:
+with a JavaFX desktop client and a JUnit/Mockito/JaCoCo safety net and now needs to
+leave the IDE entirely: something an evaluator can build once and run without cloning
+the project into their own editor. Each phase had its own core challenge:
 
 ### Quick Reminder of the previous Project Phases:
 
@@ -20,137 +21,103 @@ measured, enforced code-coverage floor. Each phase had its own core challenge:
   shared state like loyalty tiers or order counters.
   see [`MULTITHREADING-README.md`](docs/MULTITHREADING-README.md) for full details.
 
-- **Coffee Chat phase**  extend it again with a real chat feature — a CLI chat app
+- **Coffee Chat phase**  extend it again with a real chat feature  a CLI chat app
   (`CoffeeChatAppCLI`) where orders are placed *through conversation* and paid for as
   an explicit step, persisted via a handwritten JDBC layer, then wrapped in a JavaFX
   desktop UI (`CoffeeChatAppFX`) with chat bubbles, image sharing, and multi-window
   support. Full details in [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md).
 
-- **It Works On My Machine phase (this project)**  stop trusting that the previous
-  three phases still work just because they compile. Write real unit tests across
-  order processing, chat, database interactions, and the `CoffeeShop` singleton
-  lifecycle, isolate units from collaborators they don't own with Mockito where a
-  real dependency (JDBC, a payment gateway) would make a test slow or brittle, and
-  measure — then *enforce* — a minimum line-coverage floor with JaCoCo so the suite
-  can't quietly rot back down to "it works on my machine."
+- **It Works On My Machine phase**  stop trusting that the previous phases still
+  work just because they compile  add a real JUnit 5 + Mockito test suite (375
+  tests) across order processing, chat, database interactions, and the `CoffeeShop`
+  singleton lifecycle, isolating units from collaborators they don't own while
+  keeping real SQLite/in-memory fakes wherever that's more informative than a mock,
+  then enforce an 80% per-package line-coverage floor with JaCoCo so the suite can't
+  quietly rot. Full details in
+  [`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md).
+
+- **Package It phase (this project)**  turn everything built so far  the chat
+  backend, the JavaFX desktop client, and the test suite  into something that
+  doesn't require a dev environment to run or review: one self-contained,
+  executable JAR built with Maven, plus HTML test and coverage reports generated
+  automatically alongside it.
 
 ## Description
-The application itself is unchanged — every pattern, the multithreaded order queue,
-and the full chat + JDBC + JavaFX stack from the previous phases are exactly as
-described in their own READMEs mentioned in this project documentation. 
+This phase doesn't change application behavior  the coffee shop, the chat feature,
+the JavaFX UI, and the test suite are exactly as described in
+[`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md) and the
+phases before it. What it adds is a real *build*: `mvn clean package` now produces one
+JAR that runs anywhere Java 25 is installed, and `mvn verify` leaves behind reports
+that prove the tests actually ran and the coverage floor actually holds.
 
-What this phase adds is a testing and quality-gate
-layer on top of it:
+### Packaging: why maven-shade-plugin, not maven-jar-plugin or maven-assembly-plugin
+Before this phase, `maven-jar-plugin` was configured with `addClasspath=true` and
+`classpathPrefix=lib/`  the manifest told the JVM to look for every dependency
+(SQLite JDBC, the JavaFX modules) in a sibling `target/lib/` folder, but nothing in
+the build ever populated that folder. `java -jar` against that jar would fail the
+moment it tried to load a JavaFX or SQLite class.
 
-- **JUnit 5** was already integrated; this phase closed the *real* gaps rather than
-  padding the count — a `DatabaseUtilTest` for the previously-untested `DatabaseUtil`
-  (per-thread `Connection` caching, `PRAGMA busy_timeout`, schema initialization), and
-  a full suite of `Sqlite*RepositoryTest`/`InMemory*RepositoryTest` classes so every
-  chat repository is held to the same save/find/update contract, not just the ones
-  already exercised indirectly through the JavaFX integration tests.
-- **Mockito** was added specifically for collaborators the unit under test doesn't
-  own: `ChatServiceTest` mocks `PaymentGateway` to isolate payment-collection logic
-  from any concrete adapter, and `PersistingOrderObserverTest` mocks
-  `ChatOrderRepository`/`ChatNotificationService` to verify the observer dispatches
-  the right persistence + notification calls per order-status transition without a
-  real database or notification pipeline. Everything that *is* cheap and safe to run
-  for real (SQLite against a temp file, in-memory repository fakes) still runs for
-  real — mocks are reserved for genuine external collaborators, not used as a default.
-- **JaCoCo** instruments every `mvn test` run and writes an HTML/XML/CSV report to
-  `target/site/jacoco/`. A `jacoco-check` execution then *enforces* a minimum 80%
-  line-coverage ratio per package on `mvn verify`, excluding JavaFX UI/wiring code
-  and app entry points (`views`, `fx`, `fx.controllers`, the three `main()` classes) —
-  UI wiring isn't meaningfully unit-testable and gating on it would just pressure
-  people into writing tests that assert nothing, which is exactly what the assignment
-  warns against.
-- **Leftover Phase-0 demo classes were deleted**, not excluded-and-kept. Every GoF
-  pattern package used to carry a standalone `*Demo` main left over from the original
-  design-patterns-only project (its own separate repository) — dead weight that
-  existed only to drag down coverage numbers with unreachable `main()` methods. They
-  added nothing this phase's tests needed to prove, so they're gone.
-- **375 tests, 0 failures**, covering: order processing (`OrderQueueTest`,
-  `CommandTest`), chat (`ChatServiceTest`, `ChatNotificationServiceTest`,
-  `BaristaQueueTest`, `BaristaQueueRestoreTest`), database interactions
-  (`DatabaseUtilTest` and ten `Sqlite*`/`InMemory*` repository test classes), the
-  `CoffeeShop` singleton lifecycle (`SingletonTest`, `CoffeeShopMultithreadTest`),
-  every GoF pattern in isolation, and the JavaFX controllers via TestFX.
+Two ways to actually fix that: populate `target/lib/` with `maven-dependency-plugin`'s
+`copy-dependencies` goal, or build one self-contained jar with every dependency
+embedded. The assignment's own example command 
+`java -jar target/coffee-shop-app-1.0-SNAPSHOT.jar`, a single file, nothing beside it
+ is a self-contained jar, so that's what this project builds.
 
-### Testing Best Practices
-The assignment asked for more than a test count — it asked for *meaningful* tests
-built on specific best practices. Here's how each one shows up concretely in this
-codebase, not just as a claim:
+Between the two common ways to build one, **`maven-shade-plugin`** was chosen over
+**`maven-assembly-plugin`**'s `jar-with-dependencies` descriptor because of what this
+project's specific dependency set does when merged. This app pulls in 12 dependency
+jars for one build (5 JavaFX modules, each resolving both a platform-neutral jar *and*
+a Windows-native-classified jar automatically through OpenJFX's own OS-activated Maven
+profiles, plus SQLite JDBC and the JetBrains annotations jar)  and several of them
+collide on the same file path: every jar contributes its own `META-INF/MANIFEST.MF`,
+and both the annotations and SQLite jars ship a versioned
+`META-INF/versions/9/module-info.class`. `jar-with-dependencies` has no per-file
+merge/exclude configuration of its own  it just unpacks every jar into one directory
+and silently overwrites on collision, and getting any control over that means
+abandoning the simple `descriptorRef` for a fully custom assembly descriptor.
+`maven-shade-plugin` gave direct, visible control instead: a `<filters>` block
+excluding `module-info.class` and signature files (`META-INF/*.SF`/`.DSA`/`.RSA`) per
+artifact, and a `<transformers>` block (`ManifestResourceTransformer`) that sets the
+merged jar's `Main-Class` explicitly rather than leaving it to whichever dependency's
+manifest happens to win the overwrite race. The build log confirms the conflict was
+real, not hypothetical  before the `module-info.class` filter was tightened to
+`**/module-info.class` (the versioned copies live under a nested path, not the jar
+root), `mvn clean package` reported it directly:
+```bash
+[WARNING] ..., annotations-26.1.0.jar, ..., sqlite-jdbc-3.53.2.0.jar define 1 overlapping classes:
+[WARNING]   - META-INF.versions.9.module-info
+```
+`dev.saberlabs.CoffeeShopApp`  a plain launcher class that is *not* a
+`javafx.application.Application` subclass, just a `main()` that calls
+`CoffeeChatAppFX.main(args)`  stays the shaded jar's `Main-Class`. That pattern
+exists specifically to dodge the classic "JavaFX runtime components are missing"
+error, which happens when the JVM's Main-Class check sees an `Application` subclass
+launched without `--module-path`; a plain launcher on the classpath sidesteps it
+entirely.
 
-#### Isolation
-Every test is independent and repeatable in any order. Two isolation strategies are
-used deliberately, not interchangeably:
-- **Real objects for cheap, fast, in-process collaborators.** `Sqlite*RepositoryTest`
-  classes run against a real temp-file SQLite database (`DatabaseUtil.setDbPathForTesting()`)
-  instead of mocking JDBC — mocking `Connection`/`ResultSet` for an embedded driver
-  would be brittle and prove nothing about whether the SQL actually works.
-  `InMemory*RepositoryTest` classes and `AuthServiceTest` use the codebase's own
-  hand-rolled `InMemory*` fakes for the same reason: they're fast, deterministic, and
-  exercising the real object's real logic is *more* valuable than mocking it.
-- **Mockito mocks for genuine external collaborators the unit under test doesn't own.**
-  `ChatServiceTest` mocks `PaymentGateway` to isolate payment-collection logic from any
-  concrete adapter; `PersistingOrderObserverTest` mocks `ChatOrderRepository` and
-  `ChatNotificationService`; `ChatNotificationServiceTest` mocks
-  `ChatNotificationRepository` and `NotificationObserver`. In each case the class under
-  test *depends on* the interface but doesn't *own* the implementation — the textbook
-  case for a mock, used deliberately rather than as a default everywhere.
+### Test reports
+`maven-surefire-report-plugin` was added, bound to the `test` phase, so every
+`mvn test`/`verify`/`package` also writes a human-readable HTML test report to
+`target/site/surefire-report.html`  a per-class pass/fail breakdown, sitting right
+next to JaCoCo's own HTML report at `target/site/jacoco/index.html`. Between the two,
+a reviewer can open both reports in a browser without running anything themselves.
 
-#### Readability
-Every test has a `@DisplayName` describing *behavior*, not implementation
-(`"restoreStatus should not trigger Observer notifications"`, not `testRestoreStatus2`),
-grouped into `@Nested` classes per method/scenario (see `CommandTest`, `ChatServiceTest`,
-`SqliteChatOrderRepositoryTest`) so a failing test's location alone tells you what broke
-without reading the test body.
-
-#### Meaningful coverage, not just a percentage
-The JaCoCo gate (below) enforces a *floor*, not a target to game. It deliberately
-excludes JavaFX UI/wiring and app entry points rather than writing hollow tests just to
-move a number, and the tests written to close real gaps assert actual behavior and
-edge cases (empty results, not-found branches, upsert-vs-insert paths, observer
-broadcast/removal) rather than just "call the method so the line lights up green."
-
-#### Avoid hardcoding
-Fixed values that mean something are named constants, not repeated magic values —
-e.g. `DatabaseUtilTest`'s `EXPECTED_BUSY_TIMEOUT_MS` and `EXPECTED_TABLES`, so the
-*meaning* of `5000` or the table list is stated once and reused, and a future schema
-change only needs updating in one place.
-
-#### Setup and teardown
-`@BeforeEach`/`@AfterEach` reset shared/static state before and after every test so
-nothing leaks between them: `DatabaseUtil.closeAllConnections()` plus a fresh temp DB
-file per test in every `Sqlite*RepositoryTest`, `CoffeeShop.getInstance().clearOrders()`
-before command/facade tests, and `shop.close()` after any test that opens baristas.
-
-### About JaCoCo
-[JaCoCo](https://www.jacoco.org/jacoco/) (**Ja**va **Co**de **Co**verage) is a free,
-open-source library that instruments compiled bytecode at test-run time to record
-which lines, branches, and methods actually executed. It's wired into this project's
-`pom.xml` as three `jacoco-maven-plugin` executions:
-1. **`prepare-agent`** — attaches the coverage agent before tests run.
-2. **`report`** — after `mvn test`, writes human/tool-readable reports (HTML, XML, CSV)
-   to `target/site/jacoco/`.
-3. **`jacoco-check`** — on `mvn verify`, fails the build if any package's line-coverage
-   ratio falls below **80%**, with a configured `<excludes>` list so JavaFX UI/wiring
-   code and app entry points don't count against the gate (see [Enforcing the coverage
-   gate](#enforcing-the-coverage-gate) below).
-
-### About Mockito
-[Mockito](https://site.mockito.org/) is a mocking framework for Java: `mock(SomeInterface.class)`
-creates a fake implementation you control entirely in the test. `when(mock.method(...)).thenReturn(...)`
-stubs its return value; `verify(mock).method(...)` asserts it was actually called, with
-what arguments, how many times. This project uses it for exactly one purpose — isolating
-a unit from a *collaborator it depends on but doesn't own* (a payment gateway, a
-notification repository) — never as a blanket replacement for the existing `InMemory*`
-fake pattern, which stays in place wherever a real, fast, in-process object is more
-informative than a mock of one.
+### Known issues / possible improvements
+- The shaded jar embeds whichever native JavaFX classifier Maven resolved *at build
+  time*  `win` on this machine, via OpenJFX's OS-activated profiles. It's not
+  cross-platform: building on macOS/Linux would embed that OS's native classifier
+  instead, and a jar built on one OS won't run on another. A fully cross-platform
+  distributable would need OS-specific build profiles or a tool like `jlink`/
+  `jpackage` rather than one shared classifier.
+- `target/` (the built jar, JaCoCo/Surefire reports) stays gitignored in this
+  repository on purpose  it's a build output, not source  and is submitted
+  separately as its own artifact through the course's grading platform rather than
+  committed here.
 
 ## Installation
-Requires **JDK 25+** and **Maven**. Same repository as the Coffee Chat phase — no new
-dependencies to install manually; Mockito and JaCoCo are pulled in automatically via
-Maven.
+Requires **JDK 25+** and **Maven**. Same repository as the previous phases  no new
+dependencies to install manually; the packaging plugins (`maven-shade-plugin`,
+`maven-surefire-report-plugin`) are pulled in automatically via Maven.
 
 ```bash
 git clone https://git.us.qwasar.io/my_coffee_chat_214476_-yutyk/my_coffee_chat.git
@@ -160,16 +127,28 @@ mvn clean install
 
 ## Usage
 ### Running the application
-The app itself runs exactly as in the Coffee Chat phase — see
-[`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md) for the full console (`CoffeeChatAppCLI`)
-and desktop (`CoffeeChatAppFX`) walkthroughs.
+Directly from source, exactly as in the previous phases  see
+[`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md) for the full console
+(`CoffeeChatAppCLI`) and desktop (`CoffeeChatAppFX`) walkthroughs, or run
+`mvn javafx:run`.
+
+### Building and running the packaged JAR
+```bash
+mvn clean package
+java -jar target/coffee-shop-app-1.0-SNAPSHOT.jar
+```
+`mvn clean package` runs the full test suite and coverage report, then builds one
+self-contained JAR (~22 MB  every dependency, including the JavaFX native libraries,
+is embedded). No separate `lib/` folder, classpath setup, or `--module-path` flag is
+needed  `java -jar` on its own boots the JavaFX desktop client directly.
 
 ### Running the tests
 ```bash
 mvn test
 ```
 Runs the full suite and generates a coverage report at `target/site/jacoco/index.html`
-(no coverage gate — this just runs the tests and reports the numbers).
+and a test report at `target/site/surefire-report.html` (no coverage gate  this just
+runs the tests and reports the numbers).
 
 ### Enforcing the coverage gate
 ```bash
@@ -191,7 +170,8 @@ If a package fails the gate, the console prints exactly which one and by how muc
 ### Measuring Test Coverage
 `mvn test`/`mvn verify` already produce IDE-agnostic reports at
 `target/site/jacoco/index.html` (open directly in a browser), `jacoco.xml`, and
-`jacoco.csv` — usable regardless of editor. 
+`jacoco.csv`  usable regardless of editor  plus the test report at
+`target/site/surefire-report.html`.
 
 Each IDE also has its own way to run tests
 with live coverage highlighting:

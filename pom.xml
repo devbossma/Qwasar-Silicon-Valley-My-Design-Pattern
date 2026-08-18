@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>dev.saberlabs</groupId>
-    <artifactId>ItWorksOnMyMachine</artifactId>
+    <artifactId>coffee-shop-app</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>It Works On My Machine</name>
-    <description>Coffee Chat application (design patterns + multithreading + JDBC chat + JavaFX UI) extended with a JUnit 5 + Mockito test suite and JaCoCo coverage enforcement</description>
+    <name>Package It</name>
+    <description>Coffee Chat application (design patterns + multithreading + JDBC chat + JavaFX UI + JUnit 5/Mockito/JaCoCo) packaged as a self-contained, executable JAR via maven-shade-plugin, with HTML test and coverage reports generated for distribution</description>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>

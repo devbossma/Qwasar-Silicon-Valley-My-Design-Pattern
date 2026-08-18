@@ -120,7 +120,7 @@ dependencies to install manually; the packaging plugins (`maven-shade-plugin`,
 `maven-surefire-report-plugin`) are pulled in automatically via Maven.
 
 ```bash
-git clone https://git.us.qwasar.io/my_coffee_chat_214476_-yutyk/my_coffee_chat.git
+git clone https://github.com/devbossma/Qwasar-Silicon-Valley-My-Design-Pattern.git
 cd my_coffee_chat
 mvn clean install
 ```

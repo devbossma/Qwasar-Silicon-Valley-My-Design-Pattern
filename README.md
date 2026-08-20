@@ -183,10 +183,12 @@ holding.
   distributable would need OS-specific build profiles or a tool like `jlink`/
   `jpackage` rather than one shared classifier.
 - `target/` (the built jar, JaCoCo/Surefire reports) stays gitignored in this
-  repository on purpose  it's a build output, not source  and is submitted
-  separately as its own artifact through the course's grading platform rather than
-  committed here.
-
+  repository on purpose  it's a build output, but since the subject ask to submit the jar file and the test/coverage reports,
+  - I will submit a directory `./package` with the built jar and the reports alongside this repository, so the evaluator can run it without building it from scratch.
+  - you can also build it yourself with `mvn clean verify package` and find the jar and reports in `target/`.
+  - or you can use the run `java -jar package/coffee-shop-app-1.0-SNAPSHOT.jar` to run the app directly from the submitted package folder.
+  - to see the test and coverage reports, open `package/site/surefire-report.html` and `package/site/jacoco/index.html` in a browser.
+  
 ## Installation
 Requires **JDK 25+** and **Maven**. Same repository as the previous phases  no new
 dependencies to install manually; the packaging plugins (`maven-shade-plugin`,
@@ -243,7 +245,7 @@ If a package fails the gate, the console prints exactly which one and by how muc
 [WARNING] Rule violated for package dev.saberlabs.example: lines covered ratio is 0.55, but expected minimum is 0.80
 ```
 
-### Measuring Test Coverage
+### Test Coverage
 `mvn test`/`mvn verify` already produce IDE-agnostic reports at
 `target/site/jacoco/index.html` (open directly in a browser), `jacoco.xml`, and
 `jacoco.csv`  usable regardless of editor  plus the test report at
@@ -252,55 +254,25 @@ If a package fails the gate, the console prints exactly which one and by how muc
 Each IDE also has its own way to run tests
 with live coverage highlighting:
 
-#### For IntelliJ
-1. Configuring and running coverage is a two-step process:
-- Configure the engine (IntelliJ's own or JaCoCo) under **Settings → Build, Execution, Deployment → Java Coverage**.
+Referring to Measuring Test Coverage Section in [It Works On My Machine phase](docs/IT-WORKS-ON-MY-MACHINE-README.md#measuring-test-coverage) for more details.
 
- ![Configure Coverage Engine](docs/images/coverage/intellij-0-configure-coverage-engine.png)
+### Running the application from the built JAR
+```bash
+# if you built the jar yourself:
+java -jar target/coffee-shop-app-1.0-SNAPSHOT.jar
 
--  **Run ... with Coverage**. wright-click a test class/package → **More Run/Debug → 'Run CommandTest' With Coverage** or use the coverage icon next to the run button.
-   
-
-   ![Run with Coverage context menu](docs/images/coverage/intellij-1-run-with-coverage.png)
-
-2. Coverage Results:
-  - Open in the **Coverage** tool window with per-package/class percentages.
-
-   ![Coverage tool window](docs/images/coverage/intellij-2-coverage-tool-window.png)
-
-3. Open any covered source file to see inline green/red/yellow gutter highlighting.
-
-   ![Gutter highlighting](docs/images/coverage/intellij-3-gutter-highlighting.png)
-
-#### For Eclipse
-1. Install the **EclEmma** plugin (built on JaCoCo) via **Help → Eclipse Marketplace**.
-
-   ![Installing EclEmma from the Marketplace](docs/images/coverage/eclipse-1-install-eclemma.png)
-
-2. Right-click a test class/package → **Coverage As → JUnit Test**.
-
-   ![Coverage As JUnit Test](docs/images/coverage/eclipse-2-coverage-as-junit-test.png)
-
-3. Results appear in the **Coverage** view, with matching gutter highlighting in the editor.
-
-   ![Coverage view results](docs/images/coverage/eclipse-3-coverage-view-results.png)
-
-#### For VS Code
-1. Install the **Coverage Gutters** extension from the Extensions marketplace (or use
-   the Java Extension Pack's Testing sidebar if it offers **Run Tests with Coverage**
-   directly).
-
-   ![Installing Coverage Gutters](docs/images/coverage/vscode-1-install-coverage-gutters.png)
-
-2. Run `mvn test` to generate `target/site/jacoco/jacoco.xml`, then run
-   **Coverage Gutters: Display Coverage** from the Command Palette.
-   **Right-click a test class/package → **Run Tests with Coverage**.
-
-   ![Display Coverage command](docs/images/coverage/vscode-2-display-coverage-command.png)
-
-3. Gutter highlighting appears directly in the editor next to the line numbers.
-
-   ![Gutter highlighting result](docs/images/coverage/vscode-3-gutter-highlighting-result.png)
+# or if you are using the submitted package folder:
+java -jar package/coffee-shop-app-1.0-SNAPSHOT.jar
+```
+### Reading the test and coverage reports
+```bash
+# if you built the jar yourself:
+open target/site/surefire-report.html
+open target/site/jacoco/index.html
+# or if you are using the submitted package folder:
+open package/site/surefire-report.html
+open package/site/jacoco/index.html
+```
 
 ### The Core Team
 

@@ -31,18 +31,29 @@ class DatabaseUtilPathResolutionTest {
 
     @BeforeEach
     void setUp() {
+        // Save the original system properties so we can restore them after each test
         originalEnvProperty = System.getProperty(ENV_PROPERTY);
+        // Save the original OS name so we can restore it after each test
         originalOsName = System.getProperty(OS_PROPERTY);
         DatabaseUtil.clearDbPathOverrideForTesting();
     }
 
     @AfterEach
     void tearDown() {
+        // Restore the original system properties after each test
         restoreProperty(ENV_PROPERTY, originalEnvProperty);
+        // Restore the original OS name after each test
         restoreProperty(OS_PROPERTY, originalOsName);
         DatabaseUtil.clearDbPathOverrideForTesting();
     }
 
+    /**
+     * Restores a system property to its original value, or clears it if the
+     * original value was null.
+     *
+     * @param key           the system property key
+     * @param originalValue the original value of the system property, or null if it was unset
+     */
     private void restoreProperty(String key, String originalValue) {
         if (originalValue == null) {
             System.clearProperty(key);

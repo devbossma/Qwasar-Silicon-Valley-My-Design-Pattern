@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,8 +39,16 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class DatabaseUtil {
 
-    private static final String DB_DIR  = "data";
-    private static final String DB_FILE = "data/coffee-chat.db";
+    // Switches where the SQLite file lives: "dev" keeps the old CWD-relative
+    // path (convenient when running from the IDE/mvn), anything else (or
+    // unset) resolves to an OS-appropriate per-user app-data directory -- the
+    // default for the distributed jar, since a relative path resolves against
+    // whatever directory `java -jar` happens to be launched from, not the
+    // jar's own location.
+    private static final String ENV_PROPERTY  = "coffeeshop.env";
+    private static final String DEV_DB_FILE   = "data/coffee-chat.db";
+    private static final String APP_DIR_NAME  = "CoffeeShopApp";
+    private static final String DB_FILE_NAME  = "coffee-chat.db";
     private static final String URL     = "jdbc:sqlite:";
     private static final String SCHEMA_RESOURCE = "/schema.sql";
 
@@ -65,7 +74,7 @@ public class DatabaseUtil {
         Connection connection = connectionHolder.get();
         if (connection == null) {
             try {
-                String path = dbPathOverride != null ? dbPathOverride : DB_FILE;
+                String path = resolveDbPath();
                 Files.createDirectories(Path.of(path).getParent());
                 connection = DriverManager.getConnection(URL + path);
                 try (Statement stmt = connection.createStatement()) {
@@ -125,6 +134,60 @@ public class DatabaseUtil {
      */
     public static void setDbPathForTesting(@NotNull String path) {
         dbPathOverride = path;
+    }
+
+    /**
+     * Clears the test override so resolveDbPath() falls through to the
+     * dev/prod system-property logic. Package-private: only
+     * DatabaseUtilPathResolutionTest (same package) needs this to test that
+     * logic in isolation from the override every other test relies on.
+     */
+    static void clearDbPathOverrideForTesting() {
+        dbPathOverride = null;
+    }
+
+    /**
+     * Resolves where the SQLite file should live, in priority order:
+     * an explicit test override, then the {@value #ENV_PROPERTY} system
+     * property. Read fresh on every call (not cached) so the first
+     * getConnection() in a process always reflects the current setting.
+     * Package-private (not private) so DatabaseUtilPathResolutionTest can
+     * exercise it directly without going through a real getConnection().
+     */
+    static @NotNull String resolveDbPath() {
+        if (dbPathOverride != null) {
+            return dbPathOverride;
+        }
+        String env = System.getProperty(ENV_PROPERTY, "prod");
+        if ("dev".equalsIgnoreCase(env)) {
+            return DEV_DB_FILE;
+        }
+        return prodDataDirectory().resolve(DB_FILE_NAME).toString();
+    }
+
+    /**
+     * The OS-appropriate per-user application-data directory, matching each
+     * platform's own convention rather than writing next to the jar (which
+     * may not even be writable, e.g. under Program Files) or the directory
+     * the jar happened to be launched from.
+     */
+    static @NotNull Path prodDataDirectory() {
+        String userHome = System.getProperty("user.home");
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+
+        if (os.contains("win")) {
+            String localAppData = System.getenv("LOCALAPPDATA");
+            Path base = localAppData != null
+                    ? Path.of(localAppData) : Path.of(userHome, "AppData", "Local");
+            return base.resolve(APP_DIR_NAME);
+        }
+        if (os.contains("mac")) {
+            return Path.of(userHome, "Library", "Application Support", APP_DIR_NAME);
+        }
+        String xdgDataHome = System.getenv("XDG_DATA_HOME");
+        Path base = xdgDataHome != null
+                ? Path.of(xdgDataHome) : Path.of(userHome, ".local", "share");
+        return base.resolve(APP_DIR_NAME);
     }
 
     public static void execSQL(@NotNull String sql) {

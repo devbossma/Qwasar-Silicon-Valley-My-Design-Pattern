@@ -115,6 +115,48 @@ class AuthServiceTest {
         void allowsUnderscores() {
             assertDoesNotThrow(() -> authService.register("alice_smith", "password123"));
         }
+
+        @Test
+        @DisplayName("rejects an empty username")
+        void rejectsEmptyUsername() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> authService.register("", "password123"));
+        }
+
+        @Test
+        @DisplayName("rejects an empty password")
+        void rejectsEmptyPassword() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> authService.register("alice", ""));
+        }
+
+        @Test
+        @DisplayName("rejects a blank (whitespace-only) username")
+        void rejectsBlankUsername() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> authService.register("   ", "password123"));
+        }
+
+        @Test
+        @DisplayName("rejects the reserved 'manager' username")
+        void rejectsReservedManagerUsername() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> authService.register("manager", "password123"));
+        }
+
+        @Test
+        @DisplayName("rejects a null username")
+        void rejectsNullUsername() {
+            assertThrows(NullPointerException.class,
+                    () -> authService.register(null, "password123"));
+        }
+
+        @Test
+        @DisplayName("rejects a null password")
+        void rejectsNullPassword() {
+            assertThrows(NullPointerException.class,
+                    () -> authService.register("alice", null));
+        }
     }
 
     // ================================================================
@@ -146,6 +188,21 @@ class AuthServiceTest {
             authService.register("alice", "password123");
             assertThrows(AuthException.class,
                     () -> authService.login("alice", "wrongpassword"));
+        }
+
+        @Test
+        @DisplayName("rejects a null username")
+        void rejectsNullUsername() {
+            assertThrows(NullPointerException.class,
+                    () -> authService.login(null, "password123"));
+        }
+
+        @Test
+        @DisplayName("rejects a null password")
+        void rejectsNullPassword() {
+            authService.register("alice", "password123");
+            assertThrows(NullPointerException.class,
+                    () -> authService.login("alice", null));
         }
     }
 

@@ -163,6 +163,12 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>dev.saberlabs.CoffeeChatAppFX</mainClass>
+                    <!-- Keeps local dev runs writing to the project-relative data/ folder
+                         instead of the packaged jar's OS-appdata default; see
+                         DatabaseUtil.resolveDbPath(). -->
+                    <options>
+                        <option>-Dcoffeeshop.env=dev</option>
+                    </options>
                 </configuration>
             </plugin>
             <!-- JaCoCo — run with: mvn test, then open target/site/jacoco/index.html -->

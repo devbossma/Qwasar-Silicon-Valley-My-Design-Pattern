@@ -28,7 +28,7 @@ the project into their own editor. Each phase had its own core challenge:
   support. Full details in [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md).
 
 - **It Works On My Machine phase**  stop trusting that the previous phases still
-  work just because they compile  add a real JUnit 5 + Mockito test suite (375
+  work just because they compile  add a real JUnit 5 + Mockito test suite (396
   tests) across order processing, chat, database interactions, and the `CoffeeShop`
   singleton lifecycle, isolating units from collaborators they don't own while
   keeping real SQLite/in-memory fakes wherever that's more informative than a mock,
@@ -49,6 +49,51 @@ the JavaFX UI, and the test suite are exactly as described in
 phases before it. What it adds is a real *build*: `mvn clean package` now produces one
 JAR that runs anywhere Java 25 is installed, and `mvn verify` leaves behind reports
 that prove the tests actually ran and the coverage floor actually holds.
+
+### Response to peer review: test suite hardening
+Before this submission, the *It Works On My Machine* phase (the JUnit 5 + Mockito + JaCoCo
+test suite) got a written peer review. The reviewer's core praise stood as-is: the JaCoCo
+`prepare-agent`  `report`  `jacoco-check` wiring, the 80% package-level floor, the deliberate
+split between Mockito mocks and real `InMemory*`/`Sqlite*` fakes, and the exclusion list for
+JavaFX/wiring code were all confirmed correct. On top of that, four specific gaps were flagged
+to dig into. Since all further work is being submitted as part of *this* phase rather than
+reopening the previous one, the response lives here, not in
+[`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md):
+
+- **DB failure paths (locked/corrupted SQLite file)**  genuinely untested before. Closed with
+  `DatabaseUtilTest.FailureScenarioTests`: `getConnection()` against an unusable data directory,
+  and `execSQL()` against a corrupted (non-SQLite) file, both proven to surface as a
+  `RuntimeException` rather than crashing uncontrolled.
+- **`PaymentGateway` returning `false` cascading through `collectPaymentAndFulfill`**  already
+  covered, no change needed: `ChatServiceTest.CollectPaymentTests#failsWhenGatewayDeclines` (a
+  real declining `CashPaymentAdapter`) and
+  `CollectPaymentWithMockedGatewayTests#leavesOrderReadyWhenGatewayDeclines` (a mocked
+  `PaymentGateway`) both assert the order stays `READY` and `false` is returned.
+- **`OrderQueue.enqueue()`/`dequeue()` under `InterruptedException`**  already covered, no
+  change needed:
+  `OrderQueueTest#testEnqueueThrowsInterruptedExceptionWhenInterruptedWhileBlocking` and
+  `#testDequeueThrowsInterruptedExceptionWhenInterruptedWhileBlocking` already exercise both
+  blocking paths.
+- **`AuthService` validation branches only exercised incidentally**  closed. `AuthServiceTest`
+  now explicitly asserts every branch of `register()`/`login()`'s input validation: empty
+  username, empty password, blank (whitespace-only) username, the reserved `manager` username,
+  and null username/password on both methods.
+- **`SqliteUserRepository.save()` never wraps the shared `Connection` in try-with-resources**
+  (by design  `DatabaseUtil` owns the connection lifecycle) raised whether a
+  `SQLException` mid-save leaves the thread-local connection unusable for later calls on the
+  same thread. Closed with `SqliteUserRepositoryTest.ConnectionResilienceTests`: a
+  duplicate-username `UNIQUE` violation, and a too-short-username `CHECK` violation (see below),
+  each followed by a successful read *and* write on the same thread to prove the connection came
+  out of the failed statement still fully usable.
+
+While closing that last gap, `schema.sql`'s `users.username` column also picked up a
+`CHECK(LENGTH(username) >= 3)` constraint, mirroring `AuthService.register()`'s own "at least 3
+characters" rule at the database layer  defense-in-depth against anything that calls
+`SqliteUserRepository` directly, bypassing `AuthService`'s validation.
+
+Net effect: the suite grew from 375 to 387 tests, all still passing, with the 80% coverage gate
+still holding (`mvn clean verify`; see [Enforcing the coverage gate](#enforcing-the-coverage-gate)
+below).
 
 ### Packaging: why maven-shade-plugin, not maven-jar-plugin or maven-assembly-plugin
 Before this phase, `maven-jar-plugin` was configured with `addClasspath=true` and
@@ -102,6 +147,34 @@ entirely.
 next to JaCoCo's own HTML report at `target/site/jacoco/index.html`. Between the two,
 a reviewer can open both reports in a browser without running anything themselves.
 
+### Where the packaged jar stores its data
+Copying `coffee-shop-app-1.0-SNAPSHOT.jar` outside the project (e.g. onto the Desktop) and
+running `java -jar coffee-shop-app-1.0-SNAPSHOT.jar` from there surfaced a real portability
+bug: a `data/` folder appeared next to the jar, at whatever location it was launched from.
+The cause was `DatabaseUtil`'s SQLite path, `"data/coffee-chat.db"`  a relative path, which
+Java resolves against the JVM's *current working directory*, not the jar's own location or
+any fixed spot. Run the same jar from two different folders and you'd silently get two
+different, disconnected databases.
+
+The fix: `DatabaseUtil.resolveDbPath()` now switches on a `coffeeshop.env` system property.
+The default, `prod` (what the distributed jar uses when the property isn't set), resolves to
+a fixed, OS-appropriate per-user application-data directory instead:
+- Windows: `%LOCALAPPDATA%\CoffeeShopApp\`
+- macOS: `~/Library/Application Support/CoffeeShopApp/`
+- Linux: `$XDG_DATA_HOME/CoffeeShopApp/` (falling back to `~/.local/share/CoffeeShopApp/`)
+
+Passing `-Dcoffeeshop.env=dev` restores the old CWD-relative `data/coffee-chat.db` behavior 
+`mvn javafx:run` is configured to pass this automatically (see `pom.xml`'s
+`javafx-maven-plugin` config), so local development still gets a convenient,
+easy-to-delete `data/` folder at the project root, while the packaged jar defaults to a
+stable, predictable location regardless of where it's copied or launched from.
+
+`DatabaseUtilPathResolutionTest` (new) tests `resolveDbPath()`/`prodDataDirectory()`
+directly against all three OS branches and both `coffeeshop.env` values, without ever
+touching the real filesystem or creating a real app-data folder on the test machine  the
+suite grew from 387 to 396 tests over this fix, all still passing, coverage gate still
+holding.
+
 ### Known issues / possible improvements
 - The shaded jar embeds whichever native JavaFX classifier Maven resolved *at build
   time*  `win` on this machine, via OpenJFX's OS-activated profiles. It's not
@@ -140,7 +213,10 @@ java -jar target/coffee-shop-app-1.0-SNAPSHOT.jar
 `mvn clean package` runs the full test suite and coverage report, then builds one
 self-contained JAR (~22 MB  every dependency, including the JavaFX native libraries,
 is embedded). No separate `lib/` folder, classpath setup, or `--module-path` flag is
-needed  `java -jar` on its own boots the JavaFX desktop client directly.
+needed  `java -jar` on its own boots the JavaFX desktop client directly, and works the
+same way regardless of which folder the jar is copied to and launched from  see
+[Where the packaged jar stores its data](#where-the-packaged-jar-stores-its-data) above
+for its default database location and how to override it.
 
 ### Running the tests
 ```bash
@@ -159,7 +235,7 @@ Runs the full suite **and** fails the build if any (non-excluded) package falls 
 ```bash
 [INFO] Results:
 [INFO] 
-[INFO] Tests run: 375, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 396, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 If a package fails the gate, the console prints exactly which one and by how much:

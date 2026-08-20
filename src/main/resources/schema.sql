@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-     username   TEXT NOT NULL UNIQUE,
+     username   TEXT NOT NULL UNIQUE CHECK(LENGTH(username) >= 3),
      password   TEXT NOT NULL,
      role       TEXT NOT NULL,
      created_at TEXT NOT NULL

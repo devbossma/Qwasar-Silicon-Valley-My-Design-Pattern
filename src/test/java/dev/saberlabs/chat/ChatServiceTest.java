@@ -148,7 +148,7 @@ class ChatServiceTest {
         }
 
         @Test
-        @DisplayName("does not resume an INACTIVE session — creates a new one")
+        @DisplayName("does not resume an INACTIVE session - creates a new one")
         void doesNotResumeInactiveSession() {
             ChatSession first = chatService.startChat(aliceUser);
             sessionRepo.save(first.deactivate());
@@ -438,13 +438,14 @@ class ChatServiceTest {
             ChatMessage placed = chatService.processCustomerInput(
                     aliceUser, session, "order espresso");
 
+            assertNotNull(placed.orderId());
             chatService.sendOrderToKitchen(session, baristaUser.id(), placed.orderId());
             var liveOrder = shop.getOrders().stream()
                     .filter(o -> o.getOrderId().equals(placed.orderId()))
                     .findFirst().orElseThrow();
             liveOrder.setStatus(OrderStatus.READY);
 
-            // Insufficient cash — gateway will decline
+            // Insufficient cash - gateway will decline
             PaymentGateway gateway = buildCashGateway(0.01);
             boolean result = chatService.collectPaymentAndFulfill(
                     session, placed.orderId(), gateway);
@@ -455,7 +456,7 @@ class ChatServiceTest {
     }
 
     // ================================================================
-    // collectPaymentAndFulfill() — isolated from any concrete gateway via Mockito
+    // collectPaymentAndFulfill() - isolated from any concrete gateway via Mockito
     // ================================================================
 
     @Nested

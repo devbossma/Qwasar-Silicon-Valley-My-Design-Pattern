@@ -177,4 +177,38 @@ class DatabaseUtilTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("Failure scenarios")
+    class FailureScenarioTests {
+
+        @Test
+        @DisplayName("getConnection() wraps an unusable data directory in a RuntimeException")
+        void wrapsUnusableDataDirectoryInRuntimeException() throws IOException {
+            // Point the DB path at a location whose parent segment is already a
+            // plain FILE, not a directory -- Files.createDirectories() cannot
+            // create a directory there, simulating a locked/inaccessible data dir.
+            Path blockingFile = Files.createTempFile("coffee-chat-not-a-dir-", "");
+            Path unreachablePath = blockingFile.resolve("nested").resolve("db.sqlite");
+            DatabaseUtil.setDbPathForTesting(unreachablePath.toString());
+
+            try {
+                assertThrows(RuntimeException.class, DatabaseUtil::getConnection);
+            } finally {
+                Files.deleteIfExists(blockingFile);
+            }
+        }
+
+        @Test
+        @DisplayName("execSQL() wraps a query against a corrupted (non-SQLite) file in a RuntimeException")
+        void wrapsCorruptedDatabaseFileInRuntimeException() throws IOException {
+            // Overwrite the temp DB file with bytes that are not a valid SQLite
+            // header. SQLite only detects this once a statement actually touches
+            // the file, not at connection-open time.
+            Files.write(tempDbFile, "not a real sqlite database".getBytes());
+
+            assertThrows(RuntimeException.class,
+                    () -> DatabaseUtil.execSQL("CREATE TABLE probe (id INTEGER PRIMARY KEY)"));
+        }
+    }
 }

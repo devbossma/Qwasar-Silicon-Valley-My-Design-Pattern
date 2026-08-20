@@ -210,4 +210,44 @@ class SqliteUserRepositoryTest {
             assertThrows(RuntimeException.class, () -> repository.updatePassword(ghost));
         }
     }
+
+    /**
+     * save() never wraps the shared Connection in try-with-resources -- only the
+     * PreparedStatement is auto-closed -- so a SQLException mid-save must not leave
+     * the thread-local connection itself in a broken state for later calls on the
+     * same thread.
+     */
+    @Nested
+    @DisplayName("Connection resilience after a mid-save SQLException")
+    class ConnectionResilienceTests {
+
+        @Test
+        @DisplayName("save() with a duplicate username throws, without corrupting the connection")
+        void duplicateUsernameThrowsButConnectionSurvives() {
+            repository.save(newUser("nadia", Role.CUSTOMER));
+
+            // username has a UNIQUE constraint -- this violates it and raises a
+            // SQLException, wrapped as a RuntimeException by save().
+            assertThrows(RuntimeException.class,
+                    () -> repository.save(newUser("nadia", Role.CUSTOMER)));
+
+            // The same thread's connection (unchanged by the failed save) must
+            // still work for subsequent calls, both read and write.
+            assertTrue(repository.existsByUsername("nadia"));
+            assertDoesNotThrow(() -> repository.save(newUser("olga", Role.CUSTOMER)));
+            assertTrue(repository.existsByUsername("olga"));
+        }
+
+        @Test
+        @DisplayName("save() with a short username throws, without corrupting the connection")
+        void shortUsernameThrowsButConnectionSurvives() {
+            // username has a CHECK constraint -- this violates it and raises a
+            // SQLException, wrapped as a RuntimeException by save().
+            assertThrows(RuntimeException.class,
+                    () -> repository.save(newUser("ab", Role.CUSTOMER)));
+            // The same thread's connection (unchanged by the failed save) must
+            // still work for subsequent calls, both read and write.
+            assertDoesNotThrow(() -> repository.save(newUser("peter", Role.CUSTOMER)));
+        }
+    }
 }

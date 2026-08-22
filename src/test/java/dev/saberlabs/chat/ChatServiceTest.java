@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -269,6 +270,16 @@ class ChatServiceTest {
         }
 
         @Test
+        @DisplayName("processCustomerInput with no coffee type returns a SYSTEM_MESSAGE prompting for one")
+        void missingCoffeeTypeReturnsSystemError() {
+            ChatSession session = chatService.startChat(aliceUser);
+            ChatMessage result = chatService.processCustomerInput(
+                    aliceUser, session, "order");
+            assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
+            assertTrue(result.content().contains("specify a coffee type"));
+        }
+
+        @Test
         @DisplayName("processCustomerInput with unknown coffee returns a SYSTEM_MESSAGE error")
         void unknownCoffeeReturnsSystemError() {
             ChatSession session = chatService.startChat(aliceUser);
@@ -302,6 +313,30 @@ class ChatServiceTest {
             assertTrue(stored.isPresent());
             assertEquals(aliceUser.id(), stored.get().customerId());
             assertEquals(OrderStatus.PLACED.name(), stored.get().status());
+        }
+
+        @Test
+        @DisplayName("order command with 'sugar' applies the SugarDecorator")
+        void validOrderCommandWithSugar() {
+            ChatSession session = chatService.startChat(aliceUser);
+            ChatMessage result = chatService.processCustomerInput(
+                    aliceUser, session, "order espresso sugar");
+
+            assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
+            assertNotNull(result.orderId());
+            assertTrue(result.content().contains("Sugar"));
+        }
+
+        @Test
+        @DisplayName("order command with 'whipped' applies the WhippedCreamDecorator")
+        void validOrderCommandWithWhippedCream() {
+            ChatSession session = chatService.startChat(aliceUser);
+            ChatMessage result = chatService.processCustomerInput(
+                    aliceUser, session, "order espresso whipped");
+
+            assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
+            assertNotNull(result.orderId());
+            assertTrue(result.content().contains("Whipped Cream"));
         }
     }
 
@@ -364,6 +399,22 @@ class ChatServiceTest {
             var messages = chatRepo.findBySessionId(session.id());
             assertTrue(messages.stream()
                     .anyMatch(m -> m.content().contains("not found")));
+        }
+
+        @Test
+        @DisplayName("sends a system message when the shop has no open order queue")
+        void systemMessageWhenShopNotOpen() throws InterruptedException {
+            ChatSession session = chatService.startChat(aliceUser);
+            ChatMessage placed = chatService.processCustomerInput(
+                    aliceUser, session, "order espresso");
+
+            shop.close(); // clears the OrderQueue, as if the shop never opened
+
+            chatService.sendOrderToKitchen(session, baristaUser.id(), placed.orderId());
+
+            var messages = chatRepo.findBySessionId(session.id());
+            assertTrue(messages.stream()
+                    .anyMatch(m -> m.content().contains("not open")));
         }
     }
 
@@ -452,6 +503,29 @@ class ChatServiceTest {
 
             assertFalse(result);
             assertEquals(OrderStatus.READY, liveOrder.getStatus());
+        }
+
+        @Test
+        @DisplayName("succeeds even when the session has no barista assigned yet")
+        void succeedsWithNoBaristaAssigned() {
+            // startChat() with no barista ready yields a WAITING session
+            // (baristaId == null) -- collectPaymentAndFulfill() must not NPE
+            // when it falls back to the customer notification's default id.
+            ChatSession session = chatService.startChat(aliceUser);
+            ChatMessage placed = chatService.processCustomerInput(
+                    aliceUser, session, "order espresso");
+
+            var liveOrder = shop.getOrders().stream()
+                    .filter(o -> o.getOrderId().equals(placed.orderId()))
+                    .findFirst().orElseThrow();
+            liveOrder.setStatus(OrderStatus.READY);
+
+            PaymentGateway gateway = buildCashGateway(10.00);
+            boolean result = chatService.collectPaymentAndFulfill(
+                    session, placed.orderId(), gateway);
+
+            assertTrue(result);
+            assertEquals(OrderStatus.FULFILLED, liveOrder.getStatus());
         }
     }
 
@@ -570,6 +644,98 @@ class ChatServiceTest {
         @DisplayName("does not error when there are no sessions to recover")
         void noSessionsIsSafe() {
             assertDoesNotThrow(() -> chatService.recoverSessionsOnStartup());
+        }
+
+        @Test
+        @DisplayName("restores ACTIVE sessions' barista assignments without freeing the barista")
+        void restoresActiveSessionAssignments() {
+            // Simulate a session that was ACTIVE (barista assigned) before a restart
+            ChatSession active = sessionRepo.save(
+                    ChatSession.newWaitingSession(aliceUser.id()).assignTo(baristaUser.id()));
+
+            chatService.recoverSessionsOnStartup();
+
+            // The barista is occupied by the restored session, not sitting idle
+            assertEquals(0, baristaQueue.readyCount());
+
+            // Ending that session frees the barista back to the ready pool
+            baristaQueue.sessionEnded(active.id());
+            assertEquals(1, baristaQueue.readyCount());
+        }
+
+        @Test
+        @DisplayName("skips an ACTIVE session missing a barista id, instead of restoring it")
+        void skipsActiveSessionWithoutBaristaId() {
+            // Data-integrity edge case: ACTIVE status but no baristaId. Restoring
+            // this would auto-unbox a null Long into restoreActiveAssignment's
+            // primitive long parameter and throw an NPE, so it must be skipped.
+            sessionRepo.save(new ChatSession(
+                    0, aliceUser.id(), null, SessionStatus.ACTIVE, LocalDateTime.now()));
+
+            assertDoesNotThrow(() -> chatService.recoverSessionsOnStartup());
+            assertEquals(0, baristaQueue.readyCount());
+        }
+    }
+
+    // ================================================================
+    // Observer management and notification
+    // ================================================================
+
+    @Nested
+    @DisplayName("Observer registration")
+    class ObserverTests {
+
+        @Test
+        @DisplayName("a registered observer receives every sent message")
+        void registeredObserverReceivesMessage() {
+            List<ChatMessage> received = new ArrayList<>();
+            ChatObserver observer = received::add;
+
+            chatService.registerObserver(observer);
+            chatService.sendMessage(1L, aliceUser.id(), "alice", "hello");
+
+            assertEquals(1, received.size());
+            assertEquals("hello", received.get(0).content());
+        }
+
+        @Test
+        @DisplayName("a removed observer stops receiving messages")
+        void removedObserverStopsReceivingMessages() {
+            List<ChatMessage> received = new ArrayList<>();
+            ChatObserver observer = received::add;
+
+            chatService.registerObserver(observer);
+            chatService.removeObserver(observer);
+            chatService.sendMessage(1L, aliceUser.id(), "alice", "hello");
+
+            assertTrue(received.isEmpty());
+        }
+    }
+
+    // ================================================================
+    // getCoffeeShopOrdersForCustomer()
+    // ================================================================
+
+    @Nested
+    @DisplayName("getCoffeeShopOrdersForCustomer()")
+    class CoffeeShopOrdersForCustomerTests {
+
+        @Test
+        @DisplayName("returns only the given customer's live orders")
+        void returnsLiveOrdersForCustomer() {
+            ChatSession session = chatService.startChat(aliceUser);
+            chatService.processCustomerInput(aliceUser, session, "order espresso");
+
+            var orders = chatService.getCoffeeShopOrdersForCustomer(aliceUser.id());
+
+            assertEquals(1, orders.size());
+            assertEquals("CUST-" + aliceUser.id(), orders.get(0).getCustomer().getId());
+        }
+
+        @Test
+        @DisplayName("returns an empty list when the customer has no live orders")
+        void returnsEmptyWhenNoLiveOrders() {
+            assertTrue(chatService.getCoffeeShopOrdersForCustomer(999L).isEmpty());
         }
     }
 

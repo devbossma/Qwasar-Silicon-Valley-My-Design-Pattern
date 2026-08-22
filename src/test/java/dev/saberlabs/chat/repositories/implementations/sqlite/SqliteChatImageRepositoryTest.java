@@ -116,4 +116,22 @@ class SqliteChatImageRepositoryTest {
             assertTrue(repository.findAll().isEmpty());
         }
     }
+
+    /**
+     * Covers the plain catch (SQLException e) branch every read/write method
+     * falls back to for a driver-level failure that isn't a constraint
+     * violation -- e.g. the underlying table being gone.
+     */
+    @Nested
+    @DisplayName("Generic database failure (not a constraint violation)")
+    class DatabaseFailureTests {
+
+        @Test
+        @DisplayName("findBySessionId() wraps a SQLException in a RuntimeException")
+        void findBySessionIdWrapsSqlExceptionInRuntimeException() {
+            DatabaseUtil.execSQL("DROP TABLE image_uploads");
+
+            assertThrows(RuntimeException.class, () -> repository.findBySessionId(1L));
+        }
+    }
 }

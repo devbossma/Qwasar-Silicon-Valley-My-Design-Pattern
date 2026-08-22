@@ -155,4 +155,22 @@ class SqliteChatSessionRepositoryTest {
             assertTrue(repository.findActiveSessionsByBarista(999L).isEmpty());
         }
     }
+
+    /**
+     * Covers the plain catch (SQLException e) branch every read/write method
+     * falls back to for a driver-level failure that isn't a constraint
+     * violation -- e.g. the underlying table being gone.
+     */
+    @Nested
+    @DisplayName("Generic database failure (not a constraint violation)")
+    class DatabaseFailureTests {
+
+        @Test
+        @DisplayName("findById() wraps a SQLException in a RuntimeException")
+        void findByIdWrapsSqlExceptionInRuntimeException() {
+            DatabaseUtil.execSQL("DROP TABLE chat_sessions");
+
+            assertThrows(RuntimeException.class, () -> repository.findById(1L));
+        }
+    }
 }

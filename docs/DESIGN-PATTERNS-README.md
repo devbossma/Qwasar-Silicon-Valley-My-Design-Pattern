@@ -101,7 +101,7 @@ prep.prepareCoffee(); // runs the full fixed algorithm
 List<String> log = prep.getPreparationLog();
 ```
 
-Key files: `CoffeePreparationTemplate.java`, `EspressoPreparation.java`, `CappuccinoPreparation.java`, `LattePreparation.java`, `TemplateMethodDemo.java`
+Key files: `CoffeePreparationTemplate.java`, `EspressoPreparation.java`, `CappuccinoPreparation.java`, `LattePreparation.java`
 
 ---
 
@@ -207,7 +207,7 @@ src/
 │   ├── prototype/     ← Pattern 4  - CloneableCoffee + CloneableOrder + PrototypeDemo + doc.md
 │   ├── singleton/     ← Pattern 1  - CoffeeShop + SingletonDemo + doc.md
 │   ├── strategy/      ← Pattern 6  - 3 pricing strategies + StrategyDemo + doc.md
-│   └── template/      ← Pattern 5  - 3 preparations + TemplateMethodDemo + doc.md
+│   └── template/      ← Pattern 5  - 3 preparations + doc.md
 └── test/java/dev/saberlabs/
     ├── adapter/       AdapterTest.java   (28 tests)
     ├── command/       CommandTest.java   (13 tests)

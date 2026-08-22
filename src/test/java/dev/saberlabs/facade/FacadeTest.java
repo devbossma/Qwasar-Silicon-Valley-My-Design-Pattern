@@ -5,13 +5,18 @@ import dev.saberlabs.adapter.CashPaymentService;
 import dev.saberlabs.adapter.PayPalAdapter;
 import dev.saberlabs.adapter.PayPalPaymentService;
 import dev.saberlabs.adapter.PaymentGateway;
+import dev.saberlabs.decorator.MilkDecorator;
 import dev.saberlabs.factory.CappuccinoCreator;
+import dev.saberlabs.factory.CoffeeCreator;
 import dev.saberlabs.factory.EspressoCreator;
 import dev.saberlabs.factory.LatteCreator;
+import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
+import dev.saberlabs.models.Espresso;
 import dev.saberlabs.models.LoyaltyTier;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -146,6 +151,44 @@ class FacadeTest {
     }
 
     @Test
+    @DisplayName("placeOrder(customer, coffee) accepts a pre-built coffee and places it directly")
+    void placeOrderWithPrebuiltCoffee() {
+        Coffee coffee = new MilkDecorator(new Espresso());
+
+        Order order = facade.placeOrder(alice, coffee);
+
+        assertEquals(OrderStatus.PLACED, order.getStatus());
+        assertSame(coffee, order.getCoffee());
+        assertEquals(1, facade.getOrderCount());
+    }
+
+    @Test
+    @DisplayName("removeCustomer stops the customer from receiving further order notifications")
+    void removeCustomerStopsNotifications() {
+        OrderObserver mockObserver = mock(OrderObserver.class);
+        facade.registerCustomer(mockObserver);
+        facade.removeCustomer(mockObserver);
+
+        Order order = facade.placeOrder(alice, new EspressoCreator());
+        facade.processOrder(order);
+
+        verify(mockObserver, never()).update(any(), any());
+    }
+
+    @Test
+    @DisplayName("setPaymentGateway replaces the gateway used by subsequent processOrder calls")
+    void setPaymentGatewayReplacesGateway() {
+        PaymentGateway mockGateway = mock(PaymentGateway.class);
+        when(mockGateway.processPayment(anyString(), anyDouble())).thenReturn(true);
+        facade.setPaymentGateway(mockGateway);
+
+        Order order = facade.placeOrder(alice, new EspressoCreator());
+        facade.processOrder(order);
+
+        verify(mockGateway).processPayment(eq("ORDER-" + order.getOrderId()), eq(order.getFinalPrice()));
+    }
+
+    @Test
     @DisplayName("getAllOrders returns all placed orders")
     void getAllOrders() {
         facade.placeOrder(alice, new EspressoCreator());
@@ -256,6 +299,115 @@ class FacadeTest {
 
             assertEquals(OrderStatus.FULFILLED, order.getStatus());
             assertEquals(4, mockedFacade.getInvoker().getCommandHistory().size());
+        }
+    }
+
+    // ================================================================
+    // Input validation — none of the Facade's Objects.requireNonNull()
+    // guards across its public API were previously exercised.
+    // ================================================================
+
+    @Nested
+    @DisplayName("Input validation")
+    class InputValidationTests {
+
+        @Test
+        @DisplayName("constructor rejects a null payment gateway")
+        void constructorRejectsNullGateway() {
+            assertThrows(NullPointerException.class, () -> new CoffeeShopFacade(null));
+        }
+
+        @Test
+        @DisplayName("createCustomer rejects a null name")
+        void createCustomerRejectsNullName() {
+            assertThrows(NullPointerException.class, () -> facade.createCustomer(null));
+        }
+
+        @Test
+        @DisplayName("registerCustomer rejects a null observer")
+        void registerCustomerRejectsNull() {
+            assertThrows(NullPointerException.class, () -> facade.registerCustomer(null));
+        }
+
+        @Test
+        @DisplayName("removeCustomer rejects a null observer")
+        void removeCustomerRejectsNull() {
+            assertThrows(NullPointerException.class, () -> facade.removeCustomer(null));
+        }
+
+        @Test
+        @DisplayName("placeOrder(customer, creator, extras) rejects a null customer")
+        void placeOrderWithCreatorRejectsNullCustomer() {
+            assertThrows(NullPointerException.class,
+                    () -> facade.placeOrder(null, new EspressoCreator()));
+        }
+
+        @Test
+        @DisplayName("placeOrder(customer, creator, extras) rejects a null creator")
+        void placeOrderRejectsNullCreator() {
+            assertThrows(NullPointerException.class,
+                    () -> facade.placeOrder(alice, (CoffeeCreator) null));
+        }
+
+        @Test
+        @DisplayName("placeOrder(customer, creator, extras) rejects a null extras array")
+        void placeOrderRejectsNullExtrasArray() {
+            assertThrows(NullPointerException.class,
+                    () -> facade.placeOrder(alice, new EspressoCreator(), (String[]) null));
+        }
+
+        @Test
+        @DisplayName("placeOrder(customer, creator, extras) rejects a null element within extras")
+        void placeOrderRejectsNullExtraElement() {
+            assertThrows(NullPointerException.class,
+                    () -> facade.placeOrder(alice, new EspressoCreator(), (String) null));
+        }
+
+        @Test
+        @DisplayName("placeOrder(customer, coffee) rejects a null customer")
+        void placeOrderWithCoffeeRejectsNullCustomer() {
+            assertThrows(NullPointerException.class,
+                    () -> facade.placeOrder(null, new Espresso()));
+        }
+
+        @Test
+        @DisplayName("placeOrder(customer, coffee) rejects a null coffee")
+        void placeOrderWithCoffeeRejectsNullCoffee() {
+            assertThrows(NullPointerException.class,
+                    () -> facade.placeOrder(alice, (Coffee) null));
+        }
+
+        @Test
+        @DisplayName("processOrder rejects a null order")
+        void processOrderRejectsNull() {
+            assertThrows(NullPointerException.class, () -> facade.processOrder(null));
+        }
+
+        @Test
+        @DisplayName("reorder rejects a null previous order")
+        void reorderRejectsNull() {
+            assertThrows(NullPointerException.class, () -> facade.reorder(null));
+        }
+
+        @Test
+        @DisplayName("reorderForAnotherCustomer rejects a null previous order")
+        void reorderForAnotherCustomerRejectsNullOrder() {
+            assertThrows(NullPointerException.class,
+                    () -> facade.reorderForAnotherCustomer(null, bob));
+        }
+
+        @Test
+        @DisplayName("reorderForAnotherCustomer rejects a null new customer")
+        void reorderForAnotherCustomerRejectsNullCustomer() {
+            Order aliceOrder = facade.placeOrder(alice, new EspressoCreator());
+            assertThrows(NullPointerException.class,
+                    () -> facade.reorderForAnotherCustomer(aliceOrder, null));
+        }
+
+        @Test
+        @DisplayName("setPaymentGateway rejects a null gateway")
+        void setPaymentGatewayRejectsNull() {
+            assertThrows(NullPointerException.class, () -> facade.setPaymentGateway(null));
         }
     }
 }

@@ -28,7 +28,7 @@ the project into their own editor. Each phase had its own core challenge:
   support. Full details in [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md).
 
 - **It Works On My Machine phase**  stop trusting that the previous phases still
-  work just because they compile  add a real JUnit 5 + Mockito test suite (396
+  work just because they compile  add a real JUnit 5 + Mockito test suite (471
   tests) across order processing, chat, database interactions, and the `CoffeeShop`
   singleton lifecycle, isolating units from collaborators they don't own while
   keeping real SQLite/in-memory fakes wherever that's more informative than a mock,
@@ -94,6 +94,92 @@ characters" rule at the database layer  defense-in-depth against anything that c
 Net effect: the suite grew from 375 to 387 tests, all still passing, with the 80% coverage gate
 still holding (`mvn clean verify`; see [Enforcing the coverage gate](#enforcing-the-coverage-gate)
 below).
+
+### Response to peer review: packaging phase
+This *Package It* submission itself then got a second peer review. The reviewer confirmed the
+`maven-shade-plugin` reasoning and the `DatabaseUtil.resolveDbPath()` portability fix (both
+documented above) were sound, and raised three follow-ups:
+
+- **`pom.xml` wasn't visible in the reviewed diff**, so the shade config, the `Main-Class`
+  manifest entry, and the `javafx-maven-plugin`'s `coffeeshop.env=dev` wiring could only be
+  taken on faith from this README's prose. Not a code issue, but noted here as a reminder for
+  future submissions: `pom.xml` is a five-second read and should always travel with the PR
+  alongside the narrative describing it, not stand in for it.
+- **Repository classes' generic `catch (SQLException e)` branches were never exercised** (marked
+  `nc` in the JaCoCo report, e.g. `SqliteUserRepository`'s `findByUsername()`), because the
+  previous round of failure-path tests concentrated entirely on `DatabaseUtilTest` (file-level
+  corruption) and constraint violations (`UNIQUE`/`CHECK`). Neither proves a repository handles a
+  driver-level failure that's independent of both, e.g. the table itself being gone. Closed with
+  one new `DatabaseFailureTests` nested class per `Sqlite*RepositoryTest` (six total: `User`,
+  `Chat`, `ChatSession`, `ChatNotification`, `ChatImage`, `ChatOrder`), each dropping its table
+  with `DatabaseUtil.execSQL("DROP TABLE ...")` and asserting a read method wraps the resulting
+  `SQLException` in a `RuntimeException`.
+- **`User.toString()`/`hasRole()` and `ChatMessage`/`ImageUpload`'s `toString()`/`isOrderMessage()`
+  sat at 0-20% coverage**  deprioritized as "just formatting" despite being one-line assertions
+  each. Closed with three new test classes, `UserTest`, `ChatMessageTest`, `ImageUploadTest`,
+  covering the compact-constructor validation, every role predicate, both branches of
+  `ChatMessage.toString()`'s emoji `switch` (including the `senderId == 0` system-broadcast case),
+  and `isOrderMessage()`'s true/false paths. All three classes are now at 100% line and branch
+  coverage (`target/site/jacoco/dev.saberlabs.auth/User.html` and
+  `target/site/jacoco/dev.saberlabs.chat/{ChatMessage,ImageUpload}.html`).
+
+Net effect: the suite grew from 396 to 424 tests, all still passing, with the 80% coverage gate
+still holding.
+
+### Business logic coverage audit: closing the remaining gaps
+Beyond the two peer reviews above, a self-directed audit went looking for business-logic
+patterns (success *and* failure scenarios) that were still untested, on the theory that a
+package clearing 80% overall can still hide a whole method or class no one ever called
+directly. It found real gaps in code that predates this phase but is still exercised by
+its coverage gate:
+
+- **`CoffeeShopFacade` had essentially no input-validation tests.** None of its roughly a
+  dozen `Objects.requireNonNull()` guards across the public API (constructor, `createCustomer`,
+  `registerCustomer`/`removeCustomer`, both `placeOrder` overloads, `processOrder`, `reorder`,
+  `reorderForAnotherCustomer`, `setPaymentGateway`) had a failure-path test, and three methods
+  (`removeCustomer`, `placeOrder(customer, coffee)`, `setPaymentGateway`) had no test at all,
+  success or failure. Closed with a full `InputValidationTests` nested class plus the missing
+  success-path tests. `CoffeeShopFacade` went from 83% to 100% line coverage.
+- **`ChatService`'s Observer mechanism (`registerObserver`/`removeObserver`) had zero tests**
+  despite being a full pattern implementation, and `getCoffeeShopOrdersForCustomer()` was never
+  called by any test. Also untested: the missing-coffee-type order command (`"order"` with
+  nothing after it), `sendOrderToKitchen()` when the shop has no open queue, startup recovery of
+  an `ACTIVE` session with its barista assignment restored, a defensive branch guarding an
+  `ACTIVE` session with a null barista id (would otherwise NPE on unboxing), and
+  `collectPaymentAndFulfill()` succeeding with no barista assigned yet. `ChatService` went from
+  92% to 99% line coverage (82% to 97% branch).
+- **`OrderCommandParser`'s `sugar` and `whipped`/alias extras were never exercised**, only
+  `milk` was. Closed alongside the `ChatService` gaps above; now 100% line and branch coverage.
+- **`CoffeeDecorator`'s own `getDescription()`/`getCost()` delegation was dead code in
+  practice** because every concrete decorator (`Milk`/`Sugar`/`WhippedCreamDecorator`) overrides
+  both methods itself. A bare anonymous stub subclass in `DecoratorTest` now exercises the base
+  class's delegation directly, alongside a null-guard test for its constructor. Now 100%.
+- **`Customer` had no dedicated test class** (its 78% line coverage came incidentally from
+  `FacadeTest`). The new `CustomerTest` covers `restoreTotalOrders()`'s negative-count guard, the
+  exact loyalty-tier boundaries (5 and 10 orders), `equals()`/`hashCode()`, and `update()`'s
+  no-op branch for an order belonging to a different customer. Now 85%.
+- **`TemplateMethodDemo` was a leftover println-only demo class**, the same shape as the
+  already-excluded CLI/FX entry points, sitting at 0% coverage and dragging down
+  `dev.saberlabs.template`. It served no purpose this deep into the project and has been
+  deleted; `dev.saberlabs.template` is now at 100% coverage with nothing to exclude.
+
+A few things were deliberately left alone rather than forced into a test:
+`ChatService.sendOrderToKitchen()`'s `InterruptedException` catch (the same failure mode
+already proven at the `OrderQueue` level; reproducing it here needs a timing-dependent
+thread-interrupt against a live background barista, for little marginal value),
+`CoffeeShop.getInstance()`'s double-checked-locking re-check and `close()`'s
+interrupted-while-joining branch (genuine races, not reliably testable without flaky thread
+choreography), and `AuthService`'s `NoSuchAlgorithmException` catch (SHA-256 is guaranteed
+available on every JVM). Also worth a look separately: `LoyaltyTier`'s Javadoc describes tier
+thresholds as 0-5/6-10/11+ orders, but `Customer.recalculateTier()`'s actual code is
+0-4/5-9/10+ (`>= 5`/`>= 10`); the new tests assert the real behavior, not the doc.
+
+Net effect: the suite grew from 424 to 471 tests, all still passing. On the business logic this
+project's coverage gate actually holds to (every package except the JavaFX views/controllers and
+the three CLI/FX entry-point classes, all excluded as UI wiring, see
+[Known issues](#known-issues--possible-improvements) below), line coverage is **94.3%**
+(8,241 of 8,738 lines). Including the excluded JavaFX UI code, the whole-repository figure is
+61.3%, which is why the gate is scoped the way it is.
 
 ### Packaging: why maven-shade-plugin, not maven-jar-plugin or maven-assembly-plugin
 Before this phase, `maven-jar-plugin` was configured with `addClasspath=true` and
@@ -188,6 +274,12 @@ holding.
   - you can also build it yourself with `mvn clean verify package` and find the jar and reports in `target/`.
   - or you can use the run `java -jar package/coffee-shop-app-1.0-SNAPSHOT.jar` to run the app directly from the submitted package folder.
   - to see the test and coverage reports, open `package/site/surefire-report.html` and `package/site/jacoco/index.html` in a browser.
+- `LoyaltyTier`'s Javadoc describes tier thresholds as 0-5/6-10/11+ orders, but
+  `Customer.recalculateTier()`'s actual code is 0-4/5-9/10+ (`>= 5`/`>= 10`). Found while writing
+  `CustomerTest`'s tier-boundary tests (see
+  [Business logic coverage audit](#business-logic-coverage-audit-closing-the-remaining-gaps)
+  above); the tests assert the real behavior, so either the doc or the code should change to
+  match the other, but which one is intended wasn't obvious enough to guess.
   
 ## Installation
 Requires **JDK 25+** and **Maven**. Same repository as the previous phases  no new
@@ -237,7 +329,7 @@ Runs the full suite **and** fails the build if any (non-excluded) package falls 
 ```bash
 [INFO] Results:
 [INFO] 
-[INFO] Tests run: 396, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 471, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 If a package fails the gate, the console prints exactly which one and by how much:

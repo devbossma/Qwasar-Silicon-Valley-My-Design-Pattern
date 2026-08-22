@@ -54,4 +54,28 @@ class DecoratorTest {
         Coffee c = new MilkDecorator(new Espresso());
         assertInstanceOf(EspressoPreparation.class, c.getPreparation());
     }
+
+    @Test
+    @DisplayName("rejects a null wrapped coffee")
+    void rejectsNullWrappedCoffee() {
+        assertThrows(NullPointerException.class, () -> new MilkDecorator(null));
+    }
+
+    @Test
+    @DisplayName("the base CoffeeDecorator delegates getDescription()/getCost() when a subclass doesn't override them")
+    void baseDecoratorDelegatesWhenNotOverridden() {
+        // Every concrete decorator (Milk/Sugar/WhippedCream) overrides both
+        // methods itself, so CoffeeDecorator's own delegating defaults are
+        // otherwise never reached. A bare anonymous subclass exercises them
+        // directly without touching production code.
+        Coffee c = new CoffeeDecorator(new Espresso()) {
+            @Override
+            public @org.jetbrains.annotations.NotNull Coffee cloneCoffee() {
+                return this;
+            }
+        };
+
+        assertEquals("Espresso", c.getDescription());
+        assertEquals(2.50, c.getCost(), 0.001);
+    }
 }

@@ -115,4 +115,22 @@ class SqliteChatNotificationRepositoryTest {
             assertDoesNotThrow(() -> repository.markAllReadForUser(999L));
         }
     }
+
+    /**
+     * Covers the plain catch (SQLException e) branch every read/write method
+     * falls back to for a driver-level failure that isn't a constraint
+     * violation -- e.g. the underlying table being gone.
+     */
+    @Nested
+    @DisplayName("Generic database failure (not a constraint violation)")
+    class DatabaseFailureTests {
+
+        @Test
+        @DisplayName("findByUser() wraps a SQLException in a RuntimeException")
+        void findByUserWrapsSqlExceptionInRuntimeException() {
+            DatabaseUtil.execSQL("DROP TABLE notifications");
+
+            assertThrows(RuntimeException.class, () -> repository.findByUser(1L));
+        }
+    }
 }

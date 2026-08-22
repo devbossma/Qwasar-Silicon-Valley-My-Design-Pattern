@@ -250,4 +250,23 @@ class SqliteUserRepositoryTest {
             assertDoesNotThrow(() -> repository.save(newUser("peter", Role.CUSTOMER)));
         }
     }
+
+    /**
+     * The failure-path tests above all go through constraint violations
+     * (UNIQUE, CHECK). This covers the plain catch (SQLException e) branch
+     * every read/write method falls back to for any other driver-level
+     * failure -- e.g. the underlying table being gone.
+     */
+    @Nested
+    @DisplayName("Generic database failure (not a constraint violation)")
+    class DatabaseFailureTests {
+
+        @Test
+        @DisplayName("findByUsername() wraps a SQLException in a RuntimeException")
+        void findByUsernameWrapsSqlExceptionInRuntimeException() {
+            DatabaseUtil.execSQL("DROP TABLE users");
+
+            assertThrows(RuntimeException.class, () -> repository.findByUsername("nadia"));
+        }
+    }
 }

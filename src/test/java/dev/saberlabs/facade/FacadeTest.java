@@ -410,4 +410,77 @@ class FacadeTest {
             assertThrows(NullPointerException.class, () -> facade.setPaymentGateway(null));
         }
     }
+
+    // ================================================================
+    // BusinessObject (reflection framework) handler methods — exercised
+    // directly here at the unit level; dev.saberlabs.framework.InteractionHandlerTest
+    // exercises the reflective dispatch path into these same methods.
+    // ================================================================
+
+    @Nested
+    @DisplayName("BusinessObject handler methods")
+    class BusinessObjectHandlerTests {
+
+        @Test
+        @DisplayName("processRequest is a no-op that satisfies the BusinessObject contract")
+        void processRequestIsNoOp() {
+            assertDoesNotThrow(() -> facade.processRequest("anything"));
+        }
+
+        @Test
+        @DisplayName("handleOrder places a real order for a lazily-created walk-in customer")
+        void handleOrderPlacesRealOrder() {
+            facade.handleOrder("1 Cappuccino");
+
+            assertEquals(1, facade.getAllOrders().size());
+            assertTrue(facade.getAllOrders().get(0).getCoffee().getDescription().contains("Cappuccino"));
+        }
+
+        @Test
+        @DisplayName("handleOrder runs the full lifecycle: Command + Template Method + Adapter + Observer, same as placeOrder+processOrder")
+        void handleOrderRunsFullLifecycle() {
+            facade.handleOrder("1 Cappuccino");
+
+            Order order = facade.getAllOrders().get(0);
+            assertEquals(OrderStatus.FULFILLED, order.getStatus());
+            assertEquals("Walk-in Customer", order.getCustomer().getName());
+            assertEquals(1, order.getCustomer().getTotalOrders());
+            // PlaceOrderCommand + PrepareOrderCommand + FulfillOrderCommand + PayOrderCommand
+            assertEquals(4, facade.getInvoker().getCommandHistory().size());
+        }
+
+        @Test
+        @DisplayName("handleOrder reuses the same walk-in customer across calls")
+        void handleOrderReusesWalkInCustomer() {
+            facade.handleOrder("Espresso");
+            facade.handleOrder("Latte");
+
+            List<Order> orders = facade.getAllOrders();
+            assertEquals(2, orders.size());
+            assertSame(orders.get(0).getCustomer(), orders.get(1).getCustomer());
+        }
+
+        @Test
+        @DisplayName("handleOrder defaults to espresso when no known coffee type is mentioned")
+        void handleOrderDefaultsToEspresso() {
+            facade.handleOrder("surprise me");
+
+            assertTrue(facade.getAllOrders().get(0).getCoffee().getDescription().contains("Espresso"));
+        }
+
+        @Test
+        @DisplayName("handleChat appends the message to the chat log")
+        void handleChatAppendsToChatLog() {
+            facade.handleChat("Hello, barista!");
+            facade.handleChat("Is my order ready?");
+
+            assertEquals(List.of("Hello, barista!", "Is my order ready?"), facade.getChatLog());
+        }
+
+        @Test
+        @DisplayName("getChatLog returns an empty list before any chat message is handled")
+        void getChatLogStartsEmpty() {
+            assertTrue(facade.getChatLog().isEmpty());
+        }
+    }
 }

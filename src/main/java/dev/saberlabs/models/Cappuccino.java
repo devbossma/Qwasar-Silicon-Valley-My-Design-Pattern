@@ -1,7 +1,7 @@
 package dev.saberlabs.models;
 
+import dev.saberlabs.template.CappuccinoPreparation;
 import dev.saberlabs.template.CoffeePreparationTemplate;
-import dev.saberlabs.template.EspressoPreparation;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -37,6 +37,6 @@ public class Cappuccino implements Coffee {
     @Override
 
     public @NotNull CoffeePreparationTemplate getPreparation() {
-        return new EspressoPreparation();
+        return new CappuccinoPreparation();
     }
 }

@@ -6,15 +6,22 @@ import dev.saberlabs.command.OrderInvoker;
 import dev.saberlabs.command.PayOrderCommand;
 import dev.saberlabs.command.PlaceOrderCommand;
 import dev.saberlabs.command.PrepareOrderCommand;
+import dev.saberlabs.factory.CappuccinoCreator;
 import dev.saberlabs.factory.CoffeeCreator;
+import dev.saberlabs.factory.EspressoCreator;
+import dev.saberlabs.factory.LatteCreator;
 import dev.saberlabs.decorator.MilkDecorator;
 import dev.saberlabs.decorator.SugarDecorator;
 import dev.saberlabs.decorator.WhippedCreamDecorator;
+import dev.saberlabs.framework.BusinessObject;
+import dev.saberlabs.framework.ChatHandler;
+import dev.saberlabs.framework.OrderHandler;
 import dev.saberlabs.models.*;
 import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -50,11 +57,13 @@ import java.util.Objects;
  *     facade.reorderForAnotherCustomer(order, anotherCustomer);
  * </pre>
  */
-public class CoffeeShopFacade {
+public class CoffeeShopFacade implements BusinessObject {
 
     private final CoffeeShop coffeeShop;
     private final OrderInvoker invoker;
     private PaymentGateway paymentGateway;
+    private final List<String> chatLog = new ArrayList<>();
+    private Customer walkInCustomer;
 
     /**
      * Creates a new CoffeeShopFacade.
@@ -219,7 +228,67 @@ public class CoffeeShopFacade {
         this.paymentGateway = Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
     }
 
+    // ================================================================
+    // Reflection Framework (BusinessObject) — see dev.saberlabs.framework
+    // ================================================================
 
+    /**
+     * Satisfies the {@link BusinessObject} contract. Actual dispatch happens through
+     * the {@link OrderHandler}/{@link ChatHandler}-annotated methods below, invoked
+     * reflectively by {@code InteractionHandler} — this method itself does nothing.
+     */
+    @Override
+    public void processRequest(String request) {
+        // No-op; actual dispatch happens through annotated methods below
+    }
+
+    /**
+     * Places and fully processes a real order for a walk-in customer, resolving the
+     * coffee type from a case-insensitive keyword match in {@code orderDetails}
+     * (defaulting to espresso). Runs the exact same lifecycle any other order goes
+     * through — {@link #placeOrder(Customer, CoffeeCreator, String...)} followed by
+     * {@link #processOrder(Order)} — so Command history, the Template Method
+     * preparation steps, Adapter payment, and Observer/Strategy fulfillment all fire
+     * the same way they would for a normal facade caller.
+     *
+     * @param orderDetails free-text order description, e.g. "1 Cappuccino"
+     */
+    @OrderHandler
+    public void handleOrder(@NotNull String orderDetails) {
+        if (walkInCustomer == null) {
+            walkInCustomer = createCustomer("Walk-in Customer");
+        }
+        Order order = placeOrder(walkInCustomer, resolveCreator(orderDetails));
+        processOrder(order);
+    }
+
+    /**
+     * Records a chat message. This facade doesn't own the real chat subsystem
+     * ({@code ChatService} does — see {@link #getChatLog()}); this is a lightweight
+     * demonstration handler for the reflection framework.
+     *
+     * @param message the chat message
+     */
+    @ChatHandler
+    public void handleChat(@NotNull String message) {
+        chatLog.add(Objects.requireNonNull(message, "Message cannot be null"));
+    }
+
+    /**
+     * Returns the messages recorded via {@link #handleChat(String)}.
+     *
+     * @return an unmodifiable snapshot of the chat log
+     */
+    public @NotNull List<String> getChatLog() {
+        return List.copyOf(chatLog);
+    }
+
+    private static @NotNull CoffeeCreator resolveCreator(@NotNull String orderDetails) {
+        String lower = orderDetails.toLowerCase();
+        if (lower.contains("latte")) return new LatteCreator();
+        if (lower.contains("cappuccino")) return new CappuccinoCreator();
+        return new EspressoCreator();
+    }
 
     // ================================================================
     // Undo Support (Command)

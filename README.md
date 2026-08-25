@@ -1,369 +1,234 @@
-# Welcome to Package It
+# Welcome to My Framework
 ***
 
 ## Task
-A coffee shop simulation started as a pure design-patterns exercise, grew into a
-concurrent order-processing system, then into a full chat-based ordering application
-with a JavaFX desktop client and a JUnit/Mockito/JaCoCo safety net and now needs to
-leave the IDE entirely: something an evaluator can build once and run without cloning
-the project into their own editor. Each phase had its own core challenge:
+Every phase so far added a *feature* to the coffee shop application. This phase asks something
+different: step back and build a small, reusable *framework* — inspired by the coffee shop, but
+not limited to it — that lets any business type declare, with annotations, which of its methods
+handles which kind of client interaction, and dispatches to the right one at runtime via Java
+Reflection rather than a hardcoded `if`/`switch`. The challenge isn't the coffee shop domain
+logic (that's all already built); it's designing the framework's contract (`BusinessObject`),
+its meta-annotation (`@RequestMappingMeta`), the concrete annotations built on it
+(`@OrderHandler`/`@ChatHandler`), and the reflective dispatcher (`InteractionHandler`) — then
+proving the coffee shop app can run through it without becoming a second, parallel
+implementation of logic that already exists.
 
 ### Quick Reminder of the previous Project Phases:
 
-- **Design Patterns phase**  implement all 10 assigned GoF patterns *correctly*, not
+- **Design Patterns phase** — implement all 10 assigned GoF patterns *correctly*, not
   as superficial approximations, and make them cooperate inside one cohesive
   application rather than existing as isolated textbook examples.
   see [`DESIGN-PATTERNS-README.md`](docs/DESIGN-PATTERNS-README.md) for full details.
 
-- **Multithreading phase**  extend the same application so multiple customers can
+- **Multithreading phase** — extend the same application so multiple customers can
   place orders concurrently while baristas prepare them in the background, using a
   thread-safe order queue (the classic producer-consumer problem) without corrupting
   shared state like loyalty tiers or order counters.
   see [`MULTITHREADING-README.md`](docs/MULTITHREADING-README.md) for full details.
 
-- **Coffee Chat phase**  extend it again with a real chat feature  a CLI chat app
+- **Coffee Chat phase** — extend it again with a real chat feature — a CLI chat app
   (`CoffeeChatAppCLI`) where orders are placed *through conversation* and paid for as
   an explicit step, persisted via a handwritten JDBC layer, then wrapped in a JavaFX
   desktop UI (`CoffeeChatAppFX`) with chat bubbles, image sharing, and multi-window
   support. Full details in [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md).
 
-- **It Works On My Machine phase**  stop trusting that the previous phases still
-  work just because they compile  add a real JUnit 5 + Mockito test suite (471
-  tests) across order processing, chat, database interactions, and the `CoffeeShop`
+- **It Works On My Machine phase** — stop trusting that the previous phases still
+  work just because they compile — add a real JUnit 5 + Mockito test suite
+  across order processing, chat, database interactions, and the `CoffeeShop`
   singleton lifecycle, isolating units from collaborators they don't own while
   keeping real SQLite/in-memory fakes wherever that's more informative than a mock,
   then enforce an 80% per-package line-coverage floor with JaCoCo so the suite can't
   quietly rot. Full details in
   [`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md).
 
-- **Package It phase (this project)**  turn everything built so far  the chat
-  backend, the JavaFX desktop client, and the test suite  into something that
-  doesn't require a dev environment to run or review: one self-contained,
-  executable JAR built with Maven, plus HTML test and coverage reports generated
-  automatically alongside it.
+- **Package It phase** — turn everything built so far — the chat backend, the JavaFX
+  desktop client, and the test suite — into something that doesn't require a dev
+  environment to run or review: one self-contained, executable JAR built with Maven
+  (`maven-shade-plugin`), plus HTML test and coverage reports generated automatically
+  alongside it. Full details in [`PACKAGE-IT-README.md`](docs/PACKAGE-IT-README.md).
+
+- **My Framework phase (this project)** — step outside the coffee shop domain and build
+  a small, reusable reflection-based framework: a `BusinessObject` contract, a
+  `@RequestMappingMeta` meta-annotation, concrete annotations built on it, and an
+  `InteractionHandler` that dispatches to the right method purely through
+  `java.lang.reflect` — then refactor the coffee shop to use it without duplicating any
+  of its existing pattern logic.
 
 ## Description
-This phase doesn't change application behavior  the coffee shop, the chat feature,
-the JavaFX UI, and the test suite are exactly as described in
-[`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md) and the
-phases before it. What it adds is a real *build*: `mvn clean package` now produces one
-JAR that runs anywhere Java 25 is installed, and `mvn verify` leaves behind reports
-that prove the tests actually ran and the coverage floor actually holds.
 
-### Response to peer review: test suite hardening
-Before this submission, the *It Works On My Machine* phase (the JUnit 5 + Mockito + JaCoCo
-test suite) got a written peer review. The reviewer's core praise stood as-is: the JaCoCo
-`prepare-agent`  `report`  `jacoco-check` wiring, the 80% package-level floor, the deliberate
-split between Mockito mocks and real `InMemory*`/`Sqlite*` fakes, and the exclusion list for
-JavaFX/wiring code were all confirmed correct. On top of that, four specific gaps were flagged
-to dig into. Since all further work is being submitted as part of *this* phase rather than
-reopening the previous one, the response lives here, not in
-[`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md):
+### Framework structure
+A new package, `dev.saberlabs.framework`, holds the whole thing:
 
-- **DB failure paths (locked/corrupted SQLite file)**  genuinely untested before. Closed with
-  `DatabaseUtilTest.FailureScenarioTests`: `getConnection()` against an unusable data directory,
-  and `execSQL()` against a corrupted (non-SQLite) file, both proven to surface as a
-  `RuntimeException` rather than crashing uncontrolled.
-- **`PaymentGateway` returning `false` cascading through `collectPaymentAndFulfill`**  already
-  covered, no change needed: `ChatServiceTest.CollectPaymentTests#failsWhenGatewayDeclines` (a
-  real declining `CashPaymentAdapter`) and
-  `CollectPaymentWithMockedGatewayTests#leavesOrderReadyWhenGatewayDeclines` (a mocked
-  `PaymentGateway`) both assert the order stays `READY` and `false` is returned.
-- **`OrderQueue.enqueue()`/`dequeue()` under `InterruptedException`**  already covered, no
-  change needed:
-  `OrderQueueTest#testEnqueueThrowsInterruptedExceptionWhenInterruptedWhileBlocking` and
-  `#testDequeueThrowsInterruptedExceptionWhenInterruptedWhileBlocking` already exercise both
-  blocking paths.
-- **`AuthService` validation branches only exercised incidentally**  closed. `AuthServiceTest`
-  now explicitly asserts every branch of `register()`/`login()`'s input validation: empty
-  username, empty password, blank (whitespace-only) username, the reserved `manager` username,
-  and null username/password on both methods.
-- **`SqliteUserRepository.save()` never wraps the shared `Connection` in try-with-resources**
-  (by design  `DatabaseUtil` owns the connection lifecycle) raised whether a
-  `SQLException` mid-save leaves the thread-local connection unusable for later calls on the
-  same thread. Closed with `SqliteUserRepositoryTest.ConnectionResilienceTests`: a
-  duplicate-username `UNIQUE` violation, and a too-short-username `CHECK` violation (see below),
-  each followed by a successful read *and* write on the same thread to prove the connection came
-  out of the failed statement still fully usable.
+| Class / Annotation | Role |
+|---|---|
+| `BusinessObject` | Interface every business type implements: `void processRequest(String request);` |
+| `RequestMappingMeta` | Meta-annotation (`@Target(ANNOTATION_TYPE)`, `@Retention(RUNTIME)`) — marks another annotation as a request-handler annotation |
+| `OrderHandler` / `ChatHandler` | Concrete, `@RequestMappingMeta`-annotated, method-level annotations |
+| `InteractionHandler` | Reflects over a `BusinessObject`'s methods to find and invoke the one matching a request type |
+| `ReflectionUtil` | Looks up a method by name and invokes it with a single `String` argument, swallowing any failure |
+| `BusinessTestClient` | Runnable demo (`main()`), excluded from the coverage gate like the other CLI/FX entry points |
 
-While closing that last gap, `schema.sql`'s `users.username` column also picked up a
-`CHECK(LENGTH(username) >= 3)` constraint, mirroring `AuthService.register()`'s own "at least 3
-characters" rule at the database layer  defense-in-depth against anything that calls
-`SqliteUserRepository` directly, bypassing `AuthService`'s validation.
-
-Net effect: the suite grew from 375 to 387 tests, all still passing, with the 80% coverage gate
-still holding (`mvn clean verify`; see [Enforcing the coverage gate](#enforcing-the-coverage-gate)
-below).
-
-### Response to peer review: packaging phase
-This *Package It* submission itself then got a second peer review. The reviewer confirmed the
-`maven-shade-plugin` reasoning and the `DatabaseUtil.resolveDbPath()` portability fix (both
-documented above) were sound, and raised three follow-ups:
-
-- **`pom.xml` wasn't visible in the reviewed diff**, so the shade config, the `Main-Class`
-  manifest entry, and the `javafx-maven-plugin`'s `coffeeshop.env=dev` wiring could only be
-  taken on faith from this README's prose. Not a code issue, but noted here as a reminder for
-  future submissions: `pom.xml` is a five-second read and should always travel with the PR
-  alongside the narrative describing it, not stand in for it.
-- **Repository classes' generic `catch (SQLException e)` branches were never exercised** (marked
-  `nc` in the JaCoCo report, e.g. `SqliteUserRepository`'s `findByUsername()`), because the
-  previous round of failure-path tests concentrated entirely on `DatabaseUtilTest` (file-level
-  corruption) and constraint violations (`UNIQUE`/`CHECK`). Neither proves a repository handles a
-  driver-level failure that's independent of both, e.g. the table itself being gone. Closed with
-  one new `DatabaseFailureTests` nested class per `Sqlite*RepositoryTest` (six total: `User`,
-  `Chat`, `ChatSession`, `ChatNotification`, `ChatImage`, `ChatOrder`), each dropping its table
-  with `DatabaseUtil.execSQL("DROP TABLE ...")` and asserting a read method wraps the resulting
-  `SQLException` in a `RuntimeException`.
-- **`User.toString()`/`hasRole()` and `ChatMessage`/`ImageUpload`'s `toString()`/`isOrderMessage()`
-  sat at 0-20% coverage**  deprioritized as "just formatting" despite being one-line assertions
-  each. Closed with three new test classes, `UserTest`, `ChatMessageTest`, `ImageUploadTest`,
-  covering the compact-constructor validation, every role predicate, both branches of
-  `ChatMessage.toString()`'s emoji `switch` (including the `senderId == 0` system-broadcast case),
-  and `isOrderMessage()`'s true/false paths. All three classes are now at 100% line and branch
-  coverage (`target/site/jacoco/dev.saberlabs.auth/User.html` and
-  `target/site/jacoco/dev.saberlabs.chat/{ChatMessage,ImageUpload}.html`).
-
-Net effect: the suite grew from 396 to 424 tests, all still passing, with the 80% coverage gate
-still holding.
-
-### Business logic coverage audit: closing the remaining gaps
-Beyond the two peer reviews above, a self-directed audit went looking for business-logic
-patterns (success *and* failure scenarios) that were still untested, on the theory that a
-package clearing 80% overall can still hide a whole method or class no one ever called
-directly. It found real gaps in code that predates this phase but is still exercised by
-its coverage gate:
-
-- **`CoffeeShopFacade` had essentially no input-validation tests.** None of its roughly a
-  dozen `Objects.requireNonNull()` guards across the public API (constructor, `createCustomer`,
-  `registerCustomer`/`removeCustomer`, both `placeOrder` overloads, `processOrder`, `reorder`,
-  `reorderForAnotherCustomer`, `setPaymentGateway`) had a failure-path test, and three methods
-  (`removeCustomer`, `placeOrder(customer, coffee)`, `setPaymentGateway`) had no test at all,
-  success or failure. Closed with a full `InputValidationTests` nested class plus the missing
-  success-path tests. `CoffeeShopFacade` went from 83% to 100% line coverage.
-- **`ChatService`'s Observer mechanism (`registerObserver`/`removeObserver`) had zero tests**
-  despite being a full pattern implementation, and `getCoffeeShopOrdersForCustomer()` was never
-  called by any test. Also untested: the missing-coffee-type order command (`"order"` with
-  nothing after it), `sendOrderToKitchen()` when the shop has no open queue, startup recovery of
-  an `ACTIVE` session with its barista assignment restored, a defensive branch guarding an
-  `ACTIVE` session with a null barista id (would otherwise NPE on unboxing), and
-  `collectPaymentAndFulfill()` succeeding with no barista assigned yet. `ChatService` went from
-  92% to 99% line coverage (82% to 97% branch).
-- **`OrderCommandParser`'s `sugar` and `whipped`/alias extras were never exercised**, only
-  `milk` was. Closed alongside the `ChatService` gaps above; now 100% line and branch coverage.
-- **`CoffeeDecorator`'s own `getDescription()`/`getCost()` delegation was dead code in
-  practice** because every concrete decorator (`Milk`/`Sugar`/`WhippedCreamDecorator`) overrides
-  both methods itself. A bare anonymous stub subclass in `DecoratorTest` now exercises the base
-  class's delegation directly, alongside a null-guard test for its constructor. Now 100%.
-- **`Customer` had no dedicated test class** (its 78% line coverage came incidentally from
-  `FacadeTest`). The new `CustomerTest` covers `restoreTotalOrders()`'s negative-count guard, the
-  exact loyalty-tier boundaries (5 and 10 orders), `equals()`/`hashCode()`, and `update()`'s
-  no-op branch for an order belonging to a different customer. Now 85%.
-- **`TemplateMethodDemo` was a leftover println-only demo class**, the same shape as the
-  already-excluded CLI/FX entry points, sitting at 0% coverage and dragging down
-  `dev.saberlabs.template`. It served no purpose this deep into the project and has been
-  deleted; `dev.saberlabs.template` is now at 100% coverage with nothing to exclude.
-
-A few things were deliberately left alone rather than forced into a test:
-`ChatService.sendOrderToKitchen()`'s `InterruptedException` catch (the same failure mode
-already proven at the `OrderQueue` level; reproducing it here needs a timing-dependent
-thread-interrupt against a live background barista, for little marginal value),
-`CoffeeShop.getInstance()`'s double-checked-locking re-check and `close()`'s
-interrupted-while-joining branch (genuine races, not reliably testable without flaky thread
-choreography), and `AuthService`'s `NoSuchAlgorithmException` catch (SHA-256 is guaranteed
-available on every JVM). Also worth a look separately: `LoyaltyTier`'s Javadoc describes tier
-thresholds as 0-5/6-10/11+ orders, but `Customer.recalculateTier()`'s actual code is
-0-4/5-9/10+ (`>= 5`/`>= 10`); the new tests assert the real behavior, not the doc.
-
-Net effect: the suite grew from 424 to 471 tests, all still passing. On the business logic this
-project's coverage gate actually holds to (every package except the JavaFX views/controllers and
-the three CLI/FX entry-point classes, all excluded as UI wiring, see
-[Known issues](#known-issues--possible-improvements) below), line coverage is **94.3%**
-(8,241 of 8,738 lines). Including the excluded JavaFX UI code, the whole-repository figure is
-61.3%, which is why the gate is scoped the way it is.
-
-### Packaging: why maven-shade-plugin, not maven-jar-plugin or maven-assembly-plugin
-Before this phase, `maven-jar-plugin` was configured with `addClasspath=true` and
-`classpathPrefix=lib/`  the manifest told the JVM to look for every dependency
-(SQLite JDBC, the JavaFX modules) in a sibling `target/lib/` folder, but nothing in
-the build ever populated that folder. `java -jar` against that jar would fail the
-moment it tried to load a JavaFX or SQLite class.
-
-Two ways to actually fix that: populate `target/lib/` with `maven-dependency-plugin`'s
-`copy-dependencies` goal, or build one self-contained jar with every dependency
-embedded. The assignment's own example command 
-`java -jar target/coffee-shop-app-1.0-SNAPSHOT.jar`, a single file, nothing beside it
- is a self-contained jar, so that's what this project builds.
-
-Between the two common ways to build one, **`maven-shade-plugin`** was chosen over
-**`maven-assembly-plugin`**'s `jar-with-dependencies` descriptor because of what this
-project's specific dependency set does when merged. This app pulls in 12 dependency
-jars for one build (5 JavaFX modules, each resolving both a platform-neutral jar *and*
-a Windows-native-classified jar automatically through OpenJFX's own OS-activated Maven
-profiles, plus SQLite JDBC and the JetBrains annotations jar)  and several of them
-collide on the same file path: every jar contributes its own `META-INF/MANIFEST.MF`,
-and both the annotations and SQLite jars ship a versioned
-`META-INF/versions/9/module-info.class`. `jar-with-dependencies` has no per-file
-merge/exclude configuration of its own  it just unpacks every jar into one directory
-and silently overwrites on collision, and getting any control over that means
-abandoning the simple `descriptorRef` for a fully custom assembly descriptor.
-`maven-shade-plugin` gave direct, visible control instead: a `<filters>` block
-excluding `module-info.class` and signature files (`META-INF/*.SF`/`.DSA`/`.RSA`) per
-artifact, and a `<transformers>` block (`ManifestResourceTransformer`) that sets the
-merged jar's `Main-Class` explicitly rather than leaving it to whichever dependency's
-manifest happens to win the overwrite race. The build log confirms the conflict was
-real, not hypothetical  before the `module-info.class` filter was tightened to
-`**/module-info.class` (the versioned copies live under a nested path, not the jar
-root), `mvn clean package` reported it directly:
-```bash
-[WARNING] ..., annotations-26.1.0.jar, ..., sqlite-jdbc-3.53.2.0.jar define 1 overlapping classes:
-[WARNING]   - META-INF.versions.9.module-info
 ```
-`dev.saberlabs.CoffeeShopApp`  a plain launcher class that is *not* a
-`javafx.application.Application` subclass, just a `main()` that calls
-`CoffeeChatAppFX.main(args)`  stays the shaded jar's `Main-Class`. That pattern
-exists specifically to dodge the classic "JavaFX runtime components are missing"
-error, which happens when the JVM's Main-Class check sees an `Application` subclass
-launched without `--module-path`; a plain launcher on the classpath sidesteps it
-entirely.
+              Client
+                │
+                ▼
+        InteractionHandler
+        ─────────────────────────────────────────
+        + handleInteraction(BusinessObject, requestType, request)
+              └─ reflects over businessObject.getClass().getMethods()
+              └─ matches a method whose annotation is meta-annotated
+                 @RequestMappingMeta and named "<RequestType>Handler"
+              └─ delegates the actual call to ReflectionUtil.invokeMethod(...)
 
-### Test reports
-`maven-surefire-report-plugin` was added, bound to the `test` phase, so every
-`mvn test`/`verify`/`package` also writes a human-readable HTML test report to
-`target/site/surefire-report.html`  a per-class pass/fail breakdown, sitting right
-next to JaCoCo's own HTML report at `target/site/jacoco/index.html`. Between the two,
-a reviewer can open both reports in a browser without running anything themselves.
+        @RequestMappingMeta          ← meta-annotation
+              ▲
+        @OrderHandler   @ChatHandler ← concrete, method-level annotations
 
-### Where the packaged jar stores its data
-Copying `coffee-shop-app-1.0-SNAPSHOT.jar` outside the project (e.g. onto the Desktop) and
-running `java -jar coffee-shop-app-1.0-SNAPSHOT.jar` from there surfaced a real portability
-bug: a `data/` folder appeared next to the jar, at whatever location it was launched from.
-The cause was `DatabaseUtil`'s SQLite path, `"data/coffee-chat.db"`  a relative path, which
-Java resolves against the JVM's *current working directory*, not the jar's own location or
-any fixed spot. Run the same jar from two different folders and you'd silently get two
-different, disconnected databases.
+        BusinessObject                ← interface every business type implements
+              ▲
+        CoffeeShopFacade
+              @OrderHandler void handleOrder(String orderDetails)
+              @ChatHandler  void handleChat(String message)
+```
 
-The fix: `DatabaseUtil.resolveDbPath()` now switches on a `coffeeshop.env` system property.
-The default, `prod` (what the distributed jar uses when the property isn't set), resolves to
-a fixed, OS-appropriate per-user application-data directory instead:
-- Windows: `%LOCALAPPDATA%\CoffeeShopApp\`
-- macOS: `~/Library/Application Support/CoffeeShopApp/`
-- Linux: `$XDG_DATA_HOME/CoffeeShopApp/` (falling back to `~/.local/share/CoffeeShopApp/`)
+### Request-type routing: fixing the assignment's own example
+The assignment's own example `InteractionHandler` invokes the *first*
+`@RequestMappingMeta`-tagged method it finds on the target object, ignoring the `requestType`
+argument entirely — that can't be right, since its own demo client expects `"order"`, `"chat"`,
+and an unmapped type like `"feedback"` to behave differently. This implementation derives the
+expected annotation from the request type by convention — capitalize + append `"Handler"`
+(`"order"` → `OrderHandler`, `"chat"` → `ChatHandler`) — and only dispatches to a method whose
+annotation matches both that name *and* is itself meta-annotated `@RequestMappingMeta`. An
+unmapped type matches nothing and prints `"No handler found for request type: <type>"`, exactly
+the assignment's own fallback message.
 
-Passing `-Dcoffeeshop.env=dev` restores the old CWD-relative `data/coffee-chat.db` behavior 
-`mvn javafx:run` is configured to pass this automatically (see `pom.xml`'s
-`javafx-maven-plugin` config), so local development still gets a convenient,
-easy-to-delete `data/` folder at the project root, while the packaged jar defaults to a
-stable, predictable location regardless of where it's copied or launched from.
+### Why `CoffeeShopFacade` became the `BusinessObject`
+Order/chat handling in this project is split three ways: `CoffeeShop` (singleton, a data
+registry with no handler logic at all), `ChatService` (the class the live CLI and JavaFX app
+actually call for every real message), and `CoffeeShopFacade` (real `placeOrder`/`reorder`
+logic, but not wired into the live app at all — demo/test-only until now). Retrofitting
+`ChatService` would have meant touching the live order/chat flow and reconciling its
+`(User, ChatSession, String)` signature with the framework's single-`String` handler methods.
+`CoffeeShopFacade` implements `BusinessObject` instead: zero risk to the live app, and it already
+had real business logic to delegate into rather than needing new logic invented for the
+occasion.
 
-`DatabaseUtilPathResolutionTest` (new) tests `resolveDbPath()`/`prodDataDirectory()`
-directly against all three OS branches and both `coffeeshop.env` values, without ever
-touching the real filesystem or creating a real app-data folder on the test machine  the
-suite grew from 387 to 396 tests over this fix, all still passing, coverage gate still
-holding.
+### Wiring `handleOrder` into the *existing* pipeline, not a parallel one
+The first cut of `handleOrder` only called `placeOrder(...)`, so a reflection-driven order never
+actually reached `processOrder(...)` — no Template Method preparation steps, no Command history
+beyond `PlaceOrderCommand`, no payment, no fulfillment notification. Running the demo client made
+that obvious immediately: the console output stopped right after "order placed." Since the goal
+is a *new way to reach* the coffee shop's existing patterns, not a second implementation of them,
+`handleOrder` now calls `placeOrder(...)` followed by `processOrder(...)`, the same two calls any
+other facade caller makes:
+
+```java
+@OrderHandler
+public void handleOrder(@NotNull String orderDetails) {
+    if (walkInCustomer == null) {
+        walkInCustomer = createCustomer("Walk-in Customer");
+    }
+    Order order = placeOrder(walkInCustomer, resolveCreator(orderDetails));
+    processOrder(order);
+}
+```
+
+A reflection-routed order now runs the exact same lifecycle as any other order in this project —
+Factory Method → Decorator/Strategy → Singleton → Command → Template Method → Adapter → Observer
+— and `BusinessTestClient`'s console output proves it end-to-end (trimmed):
+
+```
+[NOTIFICATION] Walk-in Customer Your order has been placed.
+[CoffeeShop] New Order Placed: Order[customer=Walk-in Customer, coffee=Cappuccino, ...]
+[PrepareOrderCommand]  Preparing "Cappuccino" For Walk-in Customer! ...
+====== Starting Cappuccino preparation... ======
+...
+[NOTIFICATION] Walk-in Customer  Your order has been fulfilled. Enjoy your coffee :)
+[FulfillOrderCommand] Order fulfilled: Order[..., status=FULFILLED]
+[PayPalPaymentService] Connected to PayPal account: shop@mail.com
+[PayOrderCommand] Payment of $3.50 collected from Walk-in Customer
+No handler found for request type: feedback
+```
+
+`handleChat(String)` appends to a new `chatLog` field on the facade — real, testable state, since
+the facade doesn't own the real chat subsystem (`ChatService` does, deliberately left untouched).
+
+### An incidental bug found along the way: `Cappuccino`'s Template Method
+Wiring `handleOrder` into `processOrder` surfaced a pre-existing bug, unrelated to this phase:
+`Cappuccino.getPreparation()` returned `new EspressoPreparation()` instead of
+`new CappuccinoPreparation()` (`Latte`'s equivalent method was correct). Every cappuccino ever
+brewed in this project — through the facade, the CLI, or the JavaFX app — silently ran the wrong
+Template Method steps. It had gone unnoticed because no test asserted which preparation class a
+`Cappuccino` returns. One-line fix; `FactoryMethodTest` now asserts the preparation type for all
+three coffee types so it can't regress silently again.
+
+### Proving the framework generalizes beyond coffee
+`PR.md`'s own framing asks for "a flexible framework for handling client interactions in various
+business applications" — not one hand-fit to the coffee shop. `BusinessTestClient` also
+instantiates two more `BusinessObject` implementations, `BookStoreFacade` and `OnlineShopFacade`,
+as demo-only scaffolding (private nested classes, not part of the main framework package, no unit
+tests) to prove `InteractionHandler`/`ReflectionUtil` dispatch identically for any business type,
+not just `CoffeeShopFacade`.
 
 ### Known issues / possible improvements
-- The shaded jar embeds whichever native JavaFX classifier Maven resolved *at build
-  time*  `win` on this machine, via OpenJFX's OS-activated profiles. It's not
-  cross-platform: building on macOS/Linux would embed that OS's native classifier
-  instead, and a jar built on one OS won't run on another. A fully cross-platform
-  distributable would need OS-specific build profiles or a tool like `jlink`/
-  `jpackage` rather than one shared classifier.
-- `target/` (the built jar, JaCoCo/Surefire reports) stays gitignored in this
-  repository on purpose  it's a build output, but since the subject ask to submit the jar file and the test/coverage reports,
-  - I will submit a directory `./package` with the built jar and the reports alongside this repository, so the evaluator can run it without building it from scratch.
-  - you can also build it yourself with `mvn clean verify package` and find the jar and reports in `target/`.
-  - or you can use the run `java -jar package/coffee-shop-app-1.0-SNAPSHOT.jar` to run the app directly from the submitted package folder.
-  - to see the test and coverage reports, open `package/site/surefire-report.html` and `package/site/jacoco/index.html` in a browser.
-- `LoyaltyTier`'s Javadoc describes tier thresholds as 0-5/6-10/11+ orders, but
-  `Customer.recalculateTier()`'s actual code is 0-4/5-9/10+ (`>= 5`/`>= 10`). Found while writing
-  `CustomerTest`'s tier-boundary tests (see
-  [Business logic coverage audit](#business-logic-coverage-audit-closing-the-remaining-gaps)
-  above); the tests assert the real behavior, so either the doc or the code should change to
-  match the other, but which one is intended wasn't obvious enough to guess.
-  
+- `InteractionHandler` re-scans `businessObject.getClass().getMethods()` on every call rather
+  than building a `requestType → Method` registry once. Real frameworks that do this at scale
+  (Spring MVC's `@RequestMapping`, JAX-RS's `@Path`) build that registry once at startup; a
+  linear per-call scan is fine at this project's scale and matches the assignment's own example,
+  but wouldn't be the first choice for a high-traffic dispatcher.
+- Handler methods take exactly one `String` parameter (`ReflectionUtil.invokeMethod`'s
+  signature, per the assignment spec) — no typed/multi-parameter binding, so anything beyond a
+  single free-text string has to be parsed out of that string inside the handler itself (see
+  `handleOrder`'s coffee-type keyword matching).
+- `BookStoreFacade`/`OnlineShopFacade` are intentionally demo-only scaffolding inside
+  `BusinessTestClient` — no dedicated tests, by design, since they exist purely to demonstrate
+  the framework generalizes, not to be a real bookstore/online-shop implementation.
+
 ## Installation
-Requires **JDK 25+** and **Maven**. Same repository as the previous phases  no new
-dependencies to install manually; the packaging plugins (`maven-shade-plugin`,
-`maven-surefire-report-plugin`) are pulled in automatically via Maven.
+Requires **JDK 25+** and **Maven**. Same repository as the previous phases — no new
+dependencies to install manually.
 
 ```bash
 git clone https://github.com/devbossma/Qwasar-Silicon-Valley-My-Design-Pattern.git
-cd my_coffee_chat
+cd Qwasar-Silicon-Valley-My-Design-Pattern
 mvn clean install
 ```
 
 ## Usage
-### Running the application
-Directly from source, exactly as in the previous phases  see
-[`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md) for the full console
-(`CoffeeChatAppCLI`) and desktop (`CoffeeChatAppFX`) walkthroughs, or run
-`mvn javafx:run`.
 
-### Building and running the packaged JAR
+### Running the framework demo
 ```bash
-mvn clean package
-java -jar target/coffee-shop-app-1.0-SNAPSHOT.jar
+mvn compile
+mvn dependency:build-classpath -Dmdep.outputFile=cp.txt
+java -cp "target/classes;%cp.txt%" dev.saberlabs.framework.BusinessTestClient   # Windows
+java -cp "target/classes:$(cat cp.txt)" dev.saberlabs.framework.BusinessTestClient  # macOS/Linux
 ```
-`mvn clean package` runs the full test suite and coverage report, then builds one
-self-contained JAR (~22 MB  every dependency, including the JavaFX native libraries,
-is embedded). No separate `lib/` folder, classpath setup, or `--module-path` flag is
-needed  `java -jar` on its own boots the JavaFX desktop client directly, and works the
-same way regardless of which folder the jar is copied to and launched from  see
-[Where the packaged jar stores its data](#where-the-packaged-jar-stores-its-data) above
-for its default database location and how to override it.
+Or simply run `BusinessTestClient.main()` directly from your IDE — it's a plain Java class with
+a `main()` method, no special run configuration needed.
+
+### Running the coffee shop application
+Unchanged from the previous phases — see
+[`PACKAGE-IT-README.md`](docs/PACKAGE-IT-README.md) for building/running the packaged JAR, or
+[`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md) for the CLI/JavaFX walkthroughs.
 
 ### Running the tests
 ```bash
 mvn test
 ```
-Runs the full suite and generates a coverage report at `target/site/jacoco/index.html`
-and a test report at `target/site/surefire-report.html` (no coverage gate  this just
-runs the tests and reports the numbers).
+Runs the full suite and generates a coverage report at `target/site/jacoco/index.html` and a
+test report at `target/site/surefire-report.html`.
 
 ### Enforcing the coverage gate
 ```bash
 mvn verify
 ```
-Runs the full suite **and** fails the build if any (non-excluded) package falls below
-80% line coverage:
+Runs the full suite **and** fails the build if any (non-excluded) package falls below 80% line
+coverage:
 ```bash
 [INFO] Results:
-[INFO] 
-[INFO] Tests run: 471, Failures: 0, Errors: 0, Skipped: 0
+[INFO]
+[INFO] Tests run: 488, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
-```
-If a package fails the gate, the console prints exactly which one and by how much:
-```bash
-[WARNING] Rule violated for package dev.saberlabs.example: lines covered ratio is 0.55, but expected minimum is 0.80
-```
-
-### Test Coverage
-`mvn test`/`mvn verify` already produce IDE-agnostic reports at
-`target/site/jacoco/index.html` (open directly in a browser), `jacoco.xml`, and
-`jacoco.csv`  usable regardless of editor  plus the test report at
-`target/site/surefire-report.html`.
-
-Each IDE also has its own way to run tests
-with live coverage highlighting:
-
-Referring to Measuring Test Coverage Section in [It Works On My Machine phase](docs/IT-WORKS-ON-MY-MACHINE-README.md#measuring-test-coverage) for more details.
-
-### Running the application from the built JAR
-```bash
-# if you built the jar yourself:
-java -jar target/coffee-shop-app-1.0-SNAPSHOT.jar
-
-# or if you are using the submitted package folder:
-java -jar package/coffee-shop-app-1.0-SNAPSHOT.jar
-```
-### Reading the test and coverage reports
-```bash
-# if you built the jar yourself:
-open target/site/surefire-report.html
-open target/site/jacoco/index.html
-# or if you are using the submitted package folder:
-open package/site/surefire-report.html
-open package/site/jacoco/index.html
 ```
 
 ### The Core Team

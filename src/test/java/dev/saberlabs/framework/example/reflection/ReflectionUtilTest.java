@@ -1,11 +1,11 @@
-package dev.saberlabs.framework;
+package dev.saberlabs.framework.example.reflection;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("Reflection Framework: ReflectionUtil")
+@DisplayName("Reflection Framework Example: ReflectionUtil")
 class ReflectionUtilTest {
 
     @Test

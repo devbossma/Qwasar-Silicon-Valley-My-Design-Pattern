@@ -16,8 +16,9 @@ import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatOrderRep
 import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatRepository;
 import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatSessionRepository;
 import dev.saberlabs.db.DatabaseUtil;
+import dev.saberlabs.facade.CoffeeShopFacade;
+import dev.saberlabs.order.OrderService;
 import dev.saberlabs.order.PersistingOrderObserver;
-import dev.saberlabs.singleton.CoffeeShop;
 import dev.saberlabs.views.BaristaView;
 import dev.saberlabs.views.CustomerView;
 import dev.saberlabs.views.LoginView;
@@ -65,7 +66,11 @@ public class CoffeeChatAppCLI {
                 new ChatNotificationService(notificationRepository);
 
         BaristaQueue baristaQueue = new BaristaQueue();
-        CoffeeShop   shop         = CoffeeShop.getInstance();
+
+        // OrderService is the CLI's only door onto the CoffeeShop singleton. No payment gateway
+        // needed here: this shared instance only ever places orders; payment is still collected
+        // per-order via ChatService.collectPaymentAndFulfill's own gateway.
+        OrderService orderService = new OrderService();
 
         ChatService chatService = new ChatService(
                 chatRepository,
@@ -73,16 +78,21 @@ public class CoffeeChatAppCLI {
                 orderRepository,
                 notificationService,
                 baristaQueue,
-                shop);
+                orderService);
+
+        // CoffeeShopFacade composes the same OrderService (so its order API and the reflection
+        // framework's handleOrder share one Command/OrderInvoker pipeline) and this ChatService
+        // (for the framework's real handleChat) — the real BusinessObject for this app.
+        CoffeeShopFacade coffeeShopFacade = new CoffeeShopFacade(orderService, chatService);
 
         // ── 5. Open shop ─────────────────────────────────────────────
-        shop.open(QUEUE_CAPACITY, NUMBER_OF_BARISTAS);
+        coffeeShopFacade.open(QUEUE_CAPACITY, NUMBER_OF_BARISTAS);
 
         // ── 6. Register PersistingOrderObserver ──────────────────────
         // Mirrors every Order status transition (READY, FULFILLED) into:
         //   a) the orders table (via ChatOrderRepository)
         //   b) user-scoped notifications (via ChatNotificationService)
-        shop.registerObserver(
+        coffeeShopFacade.registerCustomer(
                 new PersistingOrderObserver(orderRepository, notificationService));
 
         // ── 7. Recover BaristaQueue from persisted sessions ──────────
@@ -103,7 +113,7 @@ public class CoffeeChatAppCLI {
 
                     case BARISTA -> new BaristaView(
                             user, chatService, notificationService,
-                            shop, scanner).run();
+                            scanner).run();
 
                     case MANAGER -> new ManagerView(
                             user, authService, userRepository,
@@ -115,7 +125,7 @@ public class CoffeeChatAppCLI {
             }
         } finally {
             System.out.println("\nShutting down Coffee Chat...");
-            shop.close();
+            coffeeShopFacade.close();
             DatabaseUtil.closeAllConnections();
             System.out.println("Goodbye!");
         }

@@ -16,7 +16,6 @@ import dev.saberlabs.fx.EmojiPicker;
 import dev.saberlabs.fx.SceneRouter;
 import dev.saberlabs.fx.SessionAware;
 import dev.saberlabs.order.StoredOrder;
-import dev.saberlabs.singleton.CoffeeShop;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -80,7 +79,6 @@ public class BaristaController
     private final AppContext              ctx                 = AppContext.getInstance();
     private final ChatService             chatService         = ctx.getChatService();
     private final ChatNotificationService notificationService = ctx.getNotificationService();
-    private final CoffeeShop              coffeeShop          = ctx.getCoffeeShop();
     private final ChatImageRepository     imageRepository     = ctx.getImageRepository();
 
     private User               user;
@@ -353,9 +351,9 @@ public class BaristaController
     }
 
     private void updateQueueLabel() {
-        var queue = coffeeShop.getOrderQueue();
-        if (queue != null) {
-            queueLabel.setText("Kitchen: " + queue.size() + "/" + queue.getCapacity());
+        var queueSnapshot = chatService.getKitchenQueueSnapshot();
+        if (queueSnapshot != null) {
+            queueLabel.setText("Kitchen: " + queueSnapshot.size() + "/" + queueSnapshot.capacity());
         }
     }
 

@@ -8,6 +8,7 @@ import dev.saberlabs.auth.User;
 import dev.saberlabs.chat.repositories.implementations.memory.*;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.order.OrderService;
 import dev.saberlabs.order.StoredOrder;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
@@ -35,6 +36,7 @@ class ChatServiceTest {
     private ChatNotificationService            notificationService;
     private BaristaQueue                       baristaQueue;
     private CoffeeShop                         shop;
+    private OrderService                       orderService;
     private ChatService                        chatService;
 
     private User aliceUser;
@@ -53,8 +55,12 @@ class ChatServiceTest {
         shop.clearOrders();
         shop.open(10, 1);
 
+        // No payment gateway needed: ChatService only ever calls placeOrder(Order) on this
+        // instance, never processOrder() — see FacadeTest for gateway-required coverage.
+        orderService = new OrderService();
+
         chatService = new ChatService(
-                chatRepo, sessionRepo, orderRepo, notificationService, baristaQueue, shop);
+                chatRepo, sessionRepo, orderRepo, notificationService, baristaQueue, orderService);
 
         aliceUser = new User(1L, "alice", "hash", Role.CUSTOMER, LocalDateTime.now());
         baristaUser = new User(2L, "sara", "hash", Role.BARISTA, LocalDateTime.now());
@@ -313,6 +319,10 @@ class ChatServiceTest {
             assertTrue(stored.isPresent());
             assertEquals(aliceUser.id(), stored.get().customerId());
             assertEquals(OrderStatus.PLACED.name(), stored.get().status());
+
+            // Placement ran through OrderService's Command pattern, not a direct
+            // CoffeeShop.placeOrder() call - see ChatService.placeParsedOrder.
+            assertEquals(1, orderService.getInvoker().getCommandHistory().size());
         }
 
         @Test

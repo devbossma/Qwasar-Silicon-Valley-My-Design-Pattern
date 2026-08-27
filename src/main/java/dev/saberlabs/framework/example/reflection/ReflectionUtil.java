@@ -1,9 +1,9 @@
-package dev.saberlabs.framework;
+package dev.saberlabs.framework.example.reflection;
 
 import java.lang.reflect.Method;
 
 /**
- * Pattern 11: REFLECTION FRAMEWORK (Reflection utility)
+ * Pattern 11: REFLECTION FRAMEWORK — EXAMPLE (Reflection utility)
  *
  * Utility methods for invoking a business object's handler methods by name.
  * Any failure (missing method, reflective access failure, or an exception

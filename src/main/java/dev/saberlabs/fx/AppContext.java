@@ -19,8 +19,9 @@ import dev.saberlabs.chat.repositories.implementations.sqlite.SqliteChatSessionR
 import dev.saberlabs.auth.repositories.UserRepository;
 import dev.saberlabs.auth.repositories.implementations.sqlite.SqliteUserRepository;
 import dev.saberlabs.db.DatabaseUtil;
+import dev.saberlabs.facade.CoffeeShopFacade;
+import dev.saberlabs.order.OrderService;
 import dev.saberlabs.order.PersistingOrderObserver;
-import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -52,7 +53,7 @@ public class AppContext {
     private final AuthService               authService;
     private final ChatNotificationService   notificationService;
     private final ChatService               chatService;
-    private final CoffeeShop               coffeeShop;
+    private final CoffeeShopFacade          coffeeShopFacade;
 
     // ── Session state ────────────────────────────────────────────────
     /** The user who successfully logged in — set by LoginController. */
@@ -76,8 +77,12 @@ public class AppContext {
 
         notificationService   = new ChatNotificationService(notificationRepository);
 
-        coffeeShop            = CoffeeShop.getInstance();
         BaristaQueue baristaQueue = new BaristaQueue();
+
+        // OrderService is the FX app's only door onto the CoffeeShop singleton. No payment
+        // gateway needed here: this shared instance only ever places orders; payment is still
+        // collected per-order via ChatService.collectPaymentAndFulfill's own gateway.
+        OrderService orderService = new OrderService();
 
         chatService = new ChatService(
                 chatRepository,
@@ -85,13 +90,18 @@ public class AppContext {
                 orderRepository,
                 notificationService,
                 baristaQueue,
-                coffeeShop);
+                orderService);
+
+        // CoffeeShopFacade composes the same OrderService (so its order API and the reflection
+        // framework's handleOrder share one Command/OrderInvoker pipeline) and this ChatService
+        // (for the framework's real handleChat) — the real BusinessObject for this app.
+        coffeeShopFacade = new CoffeeShopFacade(orderService, chatService);
 
         // ── 4. Open shop ─────────────────────────────────────────────
-        coffeeShop.open(10, 2);
+        coffeeShopFacade.open(10, 2);
 
         // ── 5. Register PersistingOrderObserver ──────────────────────
-        coffeeShop.registerObserver(
+        coffeeShopFacade.registerCustomer(
                 new PersistingOrderObserver(orderRepository, notificationService));
 
         // ── 6. Recover BaristaQueue from persisted sessions ──────────
@@ -118,7 +128,7 @@ public class AppContext {
      * Called from {@link CoffeeChatAppFX#stop()}.
      */
     public void shutdown() {
-        coffeeShop.close();
+        coffeeShopFacade.close();
         DatabaseUtil.closeAllConnections();
     }
 
@@ -134,10 +144,6 @@ public class AppContext {
 
     public @NotNull ChatNotificationService getNotificationService() {
         return notificationService;
-    }
-
-    public @NotNull CoffeeShop getCoffeeShop() {
-        return coffeeShop;
     }
 
     public @NotNull UserRepository getUserRepository() {

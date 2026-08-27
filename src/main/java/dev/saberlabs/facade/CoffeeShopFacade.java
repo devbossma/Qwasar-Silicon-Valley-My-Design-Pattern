@@ -1,24 +1,20 @@
 package dev.saberlabs.facade;
 
-import dev.saberlabs.adapter.*;
-import dev.saberlabs.command.FulfillOrderCommand;
+import dev.saberlabs.adapter.PaymentGateway;
+import dev.saberlabs.chat.ChatMessage;
+import dev.saberlabs.chat.ChatService;
 import dev.saberlabs.command.OrderInvoker;
-import dev.saberlabs.command.PayOrderCommand;
-import dev.saberlabs.command.PlaceOrderCommand;
-import dev.saberlabs.command.PrepareOrderCommand;
-import dev.saberlabs.factory.CappuccinoCreator;
 import dev.saberlabs.factory.CoffeeCreator;
-import dev.saberlabs.factory.EspressoCreator;
-import dev.saberlabs.factory.LatteCreator;
-import dev.saberlabs.decorator.MilkDecorator;
-import dev.saberlabs.decorator.SugarDecorator;
-import dev.saberlabs.decorator.WhippedCreamDecorator;
-import dev.saberlabs.framework.BusinessObject;
-import dev.saberlabs.framework.ChatHandler;
-import dev.saberlabs.framework.OrderHandler;
+import dev.saberlabs.framework.business.BusinessObject;
+import dev.saberlabs.framework.business.ChatDetails;
+import dev.saberlabs.framework.business.FeedbackDetails;
+import dev.saberlabs.framework.business.OrderDetails;
+import dev.saberlabs.framework.business.RequestType;
+import dev.saberlabs.framework.business.annotation.ChatHandler;
+import dev.saberlabs.framework.business.annotation.OrderHandler;
 import dev.saberlabs.models.*;
 import dev.saberlabs.observer.OrderObserver;
-import dev.saberlabs.singleton.CoffeeShop;
+import dev.saberlabs.order.OrderService;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -44,11 +40,24 @@ import java.util.Objects;
  *   <li><b>Adapter</b> — Payment processing through PaymentGateway</li>
  * </ul>
  *
- * The Facade reduces all of this to a few simple method calls.
+ * All of the above actually lives in {@link OrderService} — this class doesn't implement any
+ * order logic itself, it delegates every order-related call to a single {@code OrderService}
+ * instance. That keeps this Facade doing exactly what a Facade is for (a simple, unified
+ * entry point), while the real application/service logic lives in one reusable place.
+ *
+ * <h3>The reflection framework's real BusinessObject</h3>
+ * This class also composes a {@link ChatService} and implements
+ * {@link dev.saberlabs.framework.business.BusinessObject} — its {@link #handleOrder} and
+ * {@link #handleChat} methods delegate to the exact same {@code OrderService}/{@code ChatService}
+ * this class already uses for its normal API, so reflective dispatch reaches real business
+ * logic, not a stand-in. Deliberately NOT wired here: the live application's own order/chat
+ * traffic ({@code ChatService}'s own methods) does not route through reflection — see
+ * {@code framework/doc.md} for why forcing that would only add indirection without reducing
+ * anyone's work, which is not what a real framework would do.
  *
  * <h3>Usage</h3>
  * <pre>
- *     CoffeeShopFacade facade = new CoffeeShopFacade(paymentGateway);
+ *     CoffeeShopFacade facade = new CoffeeShopFacade(orderService, chatService);
  *     facade.registerCustomer(customer);
  *
  *     Order order = facade.placeOrder(customer, new EspressoCreator(), "milk", "sugar");
@@ -59,20 +68,29 @@ import java.util.Objects;
  */
 public class CoffeeShopFacade implements BusinessObject {
 
-    private final CoffeeShop coffeeShop;
-    private final OrderInvoker invoker;
-    private PaymentGateway paymentGateway;
-    private final List<String> chatLog = new ArrayList<>();
-    private Customer walkInCustomer;
+    private final OrderService orderService;
+    private final ChatService chatService;
+    private final List<String> feedbackLog = new ArrayList<>();
 
     /**
-     * Creates a new CoffeeShopFacade.
-        * Initializes the CoffeeShop singleton, the Command invoker, and sets a default payment gateway adapter.
+     * @param orderService the real order lifecycle this facade delegates its order API to
+     * @param chatService  the real chat service {@link #handleChat} delegates to
      */
-    public CoffeeShopFacade(@NotNull PaymentGateway paymentGateway) {
-        this.coffeeShop = CoffeeShop.getInstance();
-        this.invoker = new OrderInvoker();
-        this.paymentGateway = Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
+    public CoffeeShopFacade(@NotNull OrderService orderService, @NotNull ChatService chatService) {
+        this.orderService = Objects.requireNonNull(orderService, "Order service cannot be null");
+        this.chatService = Objects.requireNonNull(chatService, "Chat service cannot be null");
+    }
+
+    // ================================================================
+    // Shop Lifecycle (Singleton)
+    // ================================================================
+
+    public void open(int queueCapacity, int numberOfBaristas) {
+        orderService.open(queueCapacity, numberOfBaristas);
+    }
+
+    public void close() {
+        orderService.close();
     }
 
     // ================================================================
@@ -81,31 +99,32 @@ public class CoffeeShopFacade implements BusinessObject {
 
     public @NotNull Customer createCustomer(@NotNull String customerName) {
         Objects.requireNonNull(customerName, "Customer name cannot be null");
-        // get a random unique ID for the customer (for simplicity, using the nextCustomerId from CoffeeShop)
-        String customerId = coffeeShop.nextCustomerId();
+        String customerId = orderService.nextCustomerId();
         return new Customer(customerId, customerName);
     }
 
     /**
-     * Registers a customer as an observer to receive order notifications. ( Observer pattern)
+     * Registers an observer to receive order notifications. (Observer pattern)
      * *
-     * We're already registering the Customer at PlaceOrderCommand. so this method is typically used for manual subscription.
-     * @param customer the customer to register
+     * We're already registering the Customer at PlaceOrderCommand, so this method is typically
+     * used for manual subscription — of a Customer, or of any other {@link OrderObserver}
+     * (e.g. a persistence observer).
+     * @param observer the observer to register
      */
-    public void registerCustomer(@NotNull OrderObserver customer) {
-        Objects.requireNonNull(customer, "Customer observer cannot be null");
-        coffeeShop.registerObserver(customer);
+    public void registerCustomer(@NotNull OrderObserver observer) {
+        Objects.requireNonNull(observer, "Customer observer cannot be null");
+        orderService.registerObserver(observer);
     }
 
     /**
-     * Removes a customer from receiving order notifications.
+     * Removes an observer from receiving order status notifications.
      * This can be used if a customer wants to opt out of notifications or if they are no longer active.
      * Note that customers are automatically removed as observers when their orders are fulfilled, so this method is typically used for manual unsubscription or cleanup.
-     * @param customer the customer to remove
+     * @param observer the observer to remove
      */
-    public void removeCustomer(@NotNull OrderObserver customer) {
-        Objects.requireNonNull(customer, "Customer observer cannot be null");
-        coffeeShop.removeObserver(customer);
+    public void removeCustomer(@NotNull OrderObserver observer) {
+        Objects.requireNonNull(observer, "Customer observer cannot be null");
+        orderService.removeObserver(observer);
     }
 
     // ================================================================
@@ -115,7 +134,7 @@ public class CoffeeShopFacade implements BusinessObject {
     /**
      * Creates a coffee using the provided creator, applies extras,
      * builds an Order (auto-priced by customer's loyalty tier),
-     * and registers it with the CoffeeShop singleton.
+     * and places it.
      *
      * @param customer the customer placing the order
      * @param creator  the factory creator for the base coffee type
@@ -123,25 +142,7 @@ public class CoffeeShopFacade implements BusinessObject {
      * @return the placed Order
      */
     public @NotNull Order placeOrder(@NotNull Customer customer, @NotNull CoffeeCreator creator, @NotNull String... extras) {
-        Objects.requireNonNull(customer, "Customer cannot be null");
-        Objects.requireNonNull(creator, "Coffee creator cannot be null");
-        Objects.requireNonNull(extras, "Extras cannot be null");
-        // Factory Method — create the base coffee
-        Coffee coffee = creator.createCoffee();
-
-        // Decorator — apply extras
-        if(extras.length > 0) {
-            coffee = applyExtras(coffee, extras);
-        }
-
-
-        // Strategy — pricing auto-resolved from customer's loyalty tier
-        Order order = new Order(customer, coffee, coffeeShop.nextOrderId());
-
-        // Command + Singleton — place the order
-        invoker.executeCommand(new PlaceOrderCommand(order));
-
-        return order;
+        return orderService.placeOrder(customer, creator, extras);
     }
 
     /**
@@ -153,11 +154,18 @@ public class CoffeeShopFacade implements BusinessObject {
      * @return the placed Order
      */
     public @NotNull Order placeOrder(@NotNull Customer customer, @NotNull Coffee coffee) {
-        Objects.requireNonNull(customer, "Customer cannot be null");
-        Objects.requireNonNull(coffee, "Coffee cannot be null");
-        Order order = new Order(customer, coffee,  coffeeShop.nextOrderId());
-        invoker.executeCommand(new PlaceOrderCommand(order));
-        return order;
+        return orderService.placeOrder(customer, coffee);
+    }
+
+    /**
+     * Places an already-built order (e.g. one an owning caller assembled itself, with its own
+     * order ID).
+     *
+     * @param order the already-built order to place
+     * @return the same order, now placed
+     */
+    public @NotNull Order placeOrder(@NotNull Order order) {
+        return orderService.placeOrder(order);
     }
 
     // ================================================================
@@ -171,17 +179,11 @@ public class CoffeeShopFacade implements BusinessObject {
      * 3. Fulfill — marks complete, increments loyalty tier
      *
      * @param order the order to process
+     * @throws IllegalStateException if no payment gateway has been configured via
+     *                                {@link #setPaymentGateway(PaymentGateway)}
      */
     public void processOrder(@NotNull Order order) {
-        Objects.requireNonNull(order, "Order cannot be null");
-        // Template Method — prepare the coffee
-        invoker.executeCommand(new PrepareOrderCommand(order));
-
-        // Observer + Strategy — fulfill and increment loyalty
-        invoker.executeCommand(new FulfillOrderCommand(order));
-
-        // Adapter — collect payment
-        invoker.executeCommand(new PayOrderCommand(order, paymentGateway));
+        orderService.processOrder(order);
     }
 
     // ================================================================
@@ -196,11 +198,7 @@ public class CoffeeShopFacade implements BusinessObject {
      * @return the new cloned and processed Order
      */
     public @NotNull Order reorder(@NotNull Order previousOrder) {
-        Objects.requireNonNull(previousOrder, "Previous order cannot be null");
-        Order clonedOrder = previousOrder.cloneOrder();
-        invoker.executeCommand(new PlaceOrderCommand(clonedOrder));
-        processOrder(clonedOrder);
-        return clonedOrder;
+        return orderService.reorder(previousOrder);
     }
 
     /**
@@ -212,12 +210,7 @@ public class CoffeeShopFacade implements BusinessObject {
      * @return the new cloned and processed Order
      */
     public @NotNull Order reorderForAnotherCustomer(@NotNull Order previousOrder, @NotNull Customer newCustomer) {
-        Objects.requireNonNull(previousOrder, "Previous order cannot be null");
-        Objects.requireNonNull(newCustomer, "New customer cannot be null");
-        Order clonedOrder = previousOrder.cloneOrder(newCustomer);
-        invoker.executeCommand(new PlaceOrderCommand(clonedOrder));
-        processOrder(clonedOrder);
-        return clonedOrder;
+        return orderService.reorderForAnotherCustomer(previousOrder, newCustomer);
     }
 
     // ===============================================================
@@ -225,69 +218,64 @@ public class CoffeeShopFacade implements BusinessObject {
     // ===============================================================
 
     public void setPaymentGateway(@NotNull PaymentGateway paymentGateway) {
-        this.paymentGateway = Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
+        orderService.setPaymentGateway(paymentGateway);
     }
 
     // ================================================================
-    // Reflection Framework (BusinessObject) — see dev.saberlabs.framework
+    // Reflection Framework (BusinessObject) — see dev.saberlabs.framework.business
     // ================================================================
 
     /**
-     * Satisfies the {@link BusinessObject} contract. Actual dispatch happens through
-     * the {@link OrderHandler}/{@link ChatHandler}-annotated methods below, invoked
-     * reflectively by {@code InteractionHandler} — this method itself does nothing.
+     * The {@link BusinessObject} default/fallback handler — invoked whenever a request has no
+     * dedicated {@link OrderHandler}/{@link ChatHandler}-style annotated method, such as
+     * {@link FeedbackDetails}. There's no dedicated "feedback" subsystem in this app, so
+     * recording the raw text here for a human to review later is genuine behavior, not a
+     * stand-in for a missing one; see {@link #getFeedbackLog()}.
+     *
+     * @param request the request with no dedicated handler
      */
     @Override
-    public void processRequest(String request) {
-        // No-op; actual dispatch happens through annotated methods below
+    public void processRequest(RequestType request) {
+        Objects.requireNonNull(request, "Request cannot be null");
+        if (request instanceof FeedbackDetails feedback) {
+            feedbackLog.add(feedback.text());
+        }
     }
 
     /**
-     * Places and fully processes a real order for a walk-in customer, resolving the
-     * coffee type from a case-insensitive keyword match in {@code orderDetails}
-     * (defaulting to espresso). Runs the exact same lifecycle any other order goes
-     * through — {@link #placeOrder(Customer, CoffeeCreator, String...)} followed by
-     * {@link #processOrder(Order)} — so Command history, the Template Method
-     * preparation steps, Adapter payment, and Observer/Strategy fulfillment all fire
-     * the same way they would for a normal facade caller.
+     * Places the given, already-built order through the exact same {@link OrderService} every
+     * other caller of this facade uses — reflective dispatch reaches real placement logic, not
+     * a demo stand-in.
      *
-     * @param orderDetails free-text order description, e.g. "1 Cappuccino"
+     * @param details the order to place
+     * @return the placed order
      */
     @OrderHandler
-    public void handleOrder(@NotNull String orderDetails) {
-        if (walkInCustomer == null) {
-            walkInCustomer = createCustomer("Walk-in Customer");
-        }
-        Order order = placeOrder(walkInCustomer, resolveCreator(orderDetails));
-        processOrder(order);
+    public @NotNull Order handleOrder(@NotNull OrderDetails details) {
+        Objects.requireNonNull(details, "Order details cannot be null");
+        return orderService.placeOrder(details.order());
     }
 
     /**
-     * Records a chat message. This facade doesn't own the real chat subsystem
-     * ({@code ChatService} does — see {@link #getChatLog()}); this is a lightweight
-     * demonstration handler for the reflection framework.
+     * Sends the given chat message through the real {@link ChatService} this facade composes.
      *
-     * @param message the chat message
+     * @param details the chat message to send
+     * @return the saved, real {@link ChatMessage}
      */
     @ChatHandler
-    public void handleChat(@NotNull String message) {
-        chatLog.add(Objects.requireNonNull(message, "Message cannot be null"));
+    public @NotNull ChatMessage handleChat(@NotNull ChatDetails details) {
+        Objects.requireNonNull(details, "Chat details cannot be null");
+        return chatService.sendMessage(details.sessionId(), details.senderId(),
+                details.senderName(), details.content());
     }
 
     /**
-     * Returns the messages recorded via {@link #handleChat(String)}.
+     * Returns the request texts recorded via the {@link #processRequest(RequestType)} fallback.
      *
-     * @return an unmodifiable snapshot of the chat log
+     * @return an unmodifiable snapshot of the feedback log
      */
-    public @NotNull List<String> getChatLog() {
-        return List.copyOf(chatLog);
-    }
-
-    private static @NotNull CoffeeCreator resolveCreator(@NotNull String orderDetails) {
-        String lower = orderDetails.toLowerCase();
-        if (lower.contains("latte")) return new LatteCreator();
-        if (lower.contains("cappuccino")) return new CappuccinoCreator();
-        return new EspressoCreator();
+    public @NotNull List<String> getFeedbackLog() {
+        return List.copyOf(feedbackLog);
     }
 
     // ================================================================
@@ -298,7 +286,7 @@ public class CoffeeShopFacade implements BusinessObject {
      * Undoes the last executed command.
      */
     public void undoLastAction() {
-        invoker.undoLastCommand();
+        orderService.undoLastAction();
     }
 
     // ================================================================
@@ -311,7 +299,7 @@ public class CoffeeShopFacade implements BusinessObject {
      * @return unmodifiable list of all orders
      */
     public @NotNull List<Order> getAllOrders() {
-        return coffeeShop.getOrders();
+        return orderService.getAllOrders();
     }
 
     /**
@@ -320,7 +308,7 @@ public class CoffeeShopFacade implements BusinessObject {
      * @return the order count
      */
     public int getOrderCount() {
-        return coffeeShop.getOrderCount();
+        return orderService.getOrderCount();
     }
 
     /**
@@ -329,30 +317,6 @@ public class CoffeeShopFacade implements BusinessObject {
      * @return the order invoker
      */
     public @NotNull OrderInvoker getInvoker() {
-        return invoker;
-    }
-
-    // ================================================================
-    // Internal Helpers
-    // ================================================================
-
-    /**
-     * Applies decorator extras to a base coffee.
-     *
-     * @param coffee the base coffee
-     * @param extras the extras to apply: "milk", "sugar", "whippedcream"
-     * @return the decorated coffee
-     */
-    private @NotNull Coffee applyExtras(@NotNull Coffee coffee, @NotNull String... extras) {
-        for (String extra : extras) {
-            Objects.requireNonNull(extra, "Extra cannot be null");
-            coffee = switch (extra.toLowerCase()) {
-                case "milk" -> new MilkDecorator(coffee);
-                case "sugar" -> new SugarDecorator(coffee);
-                case "whipped_cream" -> new WhippedCreamDecorator(coffee);
-                default -> throw new IllegalArgumentException("Unknown extra: " + extra);
-            };
-        }
-        return coffee;
+        return orderService.getInvoker();
     }
 }

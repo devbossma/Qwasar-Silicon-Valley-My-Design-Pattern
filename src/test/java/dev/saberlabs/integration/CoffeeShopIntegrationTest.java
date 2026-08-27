@@ -2,6 +2,13 @@ package dev.saberlabs.integration;
 
 import dev.saberlabs.adapter.PayPalAdapter;
 import dev.saberlabs.adapter.PayPalPaymentService;
+import dev.saberlabs.chat.BaristaQueue;
+import dev.saberlabs.chat.ChatNotificationService;
+import dev.saberlabs.chat.ChatService;
+import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatNotificationRepository;
+import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatOrderRepository;
+import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatRepository;
+import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatSessionRepository;
 import dev.saberlabs.facade.CoffeeShopFacade;
 import dev.saberlabs.factory.EspressoCreator;
 import dev.saberlabs.models.Customer;
@@ -9,6 +16,7 @@ import dev.saberlabs.models.LoyaltyTier;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
 import dev.saberlabs.observer.OrderObserver;
+import dev.saberlabs.order.OrderService;
 import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,8 +47,9 @@ class CoffeeShopIntegrationTest {
     @Test
     @DisplayName("facade orchestrates all patterns through a full order lifecycle")
     void facadeOrchestratesFullLifecycle() {
-        CoffeeShopFacade facade = new CoffeeShopFacade(
+        OrderService orderService = new OrderService(
                 new PayPalAdapter(new PayPalPaymentService("shop@mail.com", "pass")));
+        CoffeeShopFacade facade = new CoffeeShopFacade(orderService, buildChatService(orderService));
         Customer alice = facade.createCustomer("Alice");
         RecordingObserver observer = new RecordingObserver();
         facade.registerCustomer(observer);
@@ -61,8 +70,9 @@ class CoffeeShopIntegrationTest {
     @DisplayName("concurrent facade order processing keeps order state and loyalty consistent")
     void concurrentFacadeProcessingIsConsistent() throws Exception {
         int orderCount = 12;
-        CoffeeShopFacade facade = new CoffeeShopFacade(
+        OrderService orderService = new OrderService(
                 new PayPalAdapter(new PayPalPaymentService("shop@mail.com", "pass")));
+        CoffeeShopFacade facade = new CoffeeShopFacade(orderService, buildChatService(orderService));
         Customer alice = facade.createCustomer("Alice");
         RecordingObserver observer = new RecordingObserver();
         facade.registerCustomer(observer);
@@ -98,6 +108,16 @@ class CoffeeShopIntegrationTest {
         assertEquals(LoyaltyTier.GOLD, alice.getLoyaltyTier());
         assertEquals(orderCount * 4, facade.getInvoker().getCommandHistory().size());
         assertEquals(orderCount * 4, observer.notificationCount.get());
+    }
+
+    private static @NotNull ChatService buildChatService(@NotNull OrderService orderService) {
+        return new ChatService(
+                new InMemoryChatRepository(),
+                new InMemoryChatSessionRepository(),
+                new InMemoryChatOrderRepository(),
+                new ChatNotificationService(new InMemoryChatNotificationRepository()),
+                new BaristaQueue(),
+                orderService);
     }
 
     private static class RecordingObserver implements OrderObserver {

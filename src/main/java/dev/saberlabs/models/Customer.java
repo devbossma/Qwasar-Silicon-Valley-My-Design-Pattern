@@ -72,9 +72,9 @@ public class Customer implements OrderObserver {
     /**
      * Recalculates the loyalty tier based on the total number of orders.
      * Loyalty tiers are defined as follows:
-     * - REGULAR: 0-5 orders
-     * - SILVER: 6-10 orders
-     * - GOLD: 11+ orders
+     * - REGULAR: 0-4 orders
+     * - SILVER: 5-9 orders
+     * - GOLD: 10+ orders
      * This method is synchronized to ensure thread safety when updating the loyalty tier based on the total orders.
      * @param count the updated total number of orders
      */

@@ -2,7 +2,6 @@ package dev.saberlabs.views;
 
 import dev.saberlabs.auth.User;
 import dev.saberlabs.chat.*;
-import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -26,19 +25,16 @@ public class BaristaView implements ChatObserver, NotificationObserver {
     @NotNull private final User user;
     @NotNull private final ChatService chatService;
     @NotNull private final ChatNotificationService notificationService;
-    @NotNull private final CoffeeShop coffeeShop;
     @NotNull private final Scanner scanner;
     private ChatSession activeSession;
 
     public BaristaView(@NotNull User user,
                        @NotNull ChatService chatService,
                        @NotNull ChatNotificationService notificationService,
-                       @NotNull CoffeeShop coffeeShop,
                        @NotNull Scanner scanner) {
         this.user                = Objects.requireNonNull(user);
         this.chatService         = Objects.requireNonNull(chatService);
         this.notificationService = Objects.requireNonNull(notificationService);
-        this.coffeeShop          = Objects.requireNonNull(coffeeShop);
         this.scanner             = Objects.requireNonNull(scanner);
     }
 
@@ -259,10 +255,10 @@ public class BaristaView implements ChatObserver, NotificationObserver {
                     s.id(), s.customerId(), s.status(), assigned, pendingLabel);
         }
 
-        var queue = coffeeShop.getOrderQueue();
-        if (queue != null) {
+        var queueSnapshot = chatService.getKitchenQueueSnapshot();
+        if (queueSnapshot != null) {
             System.out.printf("%n  Kitchen queue: %d/%d orders waiting%n",
-                    queue.size(), queue.getCapacity());
+                    queueSnapshot.size(), queueSnapshot.capacity());
         }
     }
 

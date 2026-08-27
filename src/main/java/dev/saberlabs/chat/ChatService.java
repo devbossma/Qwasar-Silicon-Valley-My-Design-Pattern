@@ -9,8 +9,8 @@ import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
 import dev.saberlabs.models.OrderStatus;
+import dev.saberlabs.order.OrderService;
 import dev.saberlabs.order.StoredOrder;
-import dev.saberlabs.singleton.CoffeeShop;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,6 +26,17 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * Order ID continuity is owned by {@link ChatOrderRepository#nextOrderId()},
  * which queries the actual orders table rather than trusting an in-memory
  * counter — this is what survives application restarts without ID collisions.
+ * *
+ * Order placement itself is delegated to {@link OrderService#placeOrder(Order)}, so a
+ * real chat order runs through the same Command pattern (PlaceOrderCommand + OrderInvoker)
+ * as any other order placed through {@code OrderService} — not a parallel, chat-only code path.
+ * <p>
+ * This class depends on {@link OrderService} directly, not on
+ * {@code dev.saberlabs.facade.CoffeeShopFacade} — the Facade composes this class (for the
+ * reflection framework's real {@code handleChat}), so the dependency runs one direction only.
+ * There's no reflection in this class's own methods: reflective dispatch doesn't reduce this
+ * class's work, it only adds indirection, so real chat/order traffic calls {@code OrderService}
+ * directly. See {@code framework/doc.md}.
  */
 public class ChatService {
 
@@ -36,7 +47,7 @@ public class ChatService {
     @NotNull private final ChatOrderRepository orderRepository;
     @NotNull private final ChatNotificationService notificationService;
     @NotNull private final BaristaQueue baristaQueue;
-    @NotNull private final CoffeeShop coffeeShop;
+    @NotNull private final OrderService orderService;
 
     @NotNull private final CopyOnWriteArraySet<ChatObserver> observers =
             new CopyOnWriteArraySet<>();
@@ -50,13 +61,13 @@ public class ChatService {
                        @NotNull ChatOrderRepository orderRepository,
                        @NotNull ChatNotificationService notificationService,
                        @NotNull BaristaQueue baristaQueue,
-                       @NotNull CoffeeShop coffeeShop) {
+                       @NotNull OrderService orderService) {
         this.chatRepository      = Objects.requireNonNull(chatRepository);
         this.sessionRepository   = Objects.requireNonNull(sessionRepository);
         this.orderRepository     = Objects.requireNonNull(orderRepository);
         this.notificationService = Objects.requireNonNull(notificationService);
         this.baristaQueue        = Objects.requireNonNull(baristaQueue);
-        this.coffeeShop          = Objects.requireNonNull(coffeeShop);
+        this.orderService        = Objects.requireNonNull(orderService);
     }
 
     // ================================================================
@@ -81,7 +92,7 @@ public class ChatService {
 
             customer.restoreTotalOrders(fulfilledCount);
 
-            coffeeShop.registerObserver(customer);
+            orderService.registerObserver(customer);
             return customer;
         });
     }
@@ -262,7 +273,10 @@ public class ChatService {
         Customer customer = resolveCustomer(user);
         String orderId = orderRepository.nextOrderId();
         Order order = new Order(customer, coffee, orderId);
-        coffeeShop.placeOrder(order);
+        // Runs through OrderService's Command pattern (PlaceOrderCommand + OrderInvoker)
+        // instead of touching the CoffeeShop singleton directly, so every real order in the
+        // app — chat or otherwise — goes through the same placement pipeline.
+        orderService.placeOrder(order);
 
         StoredOrder stored = new StoredOrder(
                 orderId, user.id(), null, session.id(),
@@ -310,21 +324,18 @@ public class ChatService {
         Objects.requireNonNull(session, "Session cannot be null");
         Objects.requireNonNull(orderId, "Order ID cannot be null");
 
-        var queue = coffeeShop.getOrderQueue();
-        if (queue == null) {
+        if (!orderService.isOpen()) {
             sendSystemMessage(session.id(), "The shop is not open right now.");
             return;
         }
 
-        coffeeShop.getOrders().stream()
-                .filter(o -> o.getOrderId().equals(orderId))
-                .findFirst()
+        orderService.findByOrderId(orderId)
                 .ifPresentOrElse(
                         order -> {
                             try {
                                 orderRepository.updateAssignmentAndStatus(
                                         orderId, baristaId, session.id(), OrderStatus.PREPARING.name());
-                                queue.enqueue(order);
+                                orderService.sendToKitchen(order);
                                 sendSystemMessage(session.id(),
                                         "Order #" + orderId + " sent to the kitchen!");
                             } catch (InterruptedException e) {
@@ -355,9 +366,7 @@ public class ChatService {
         Objects.requireNonNull(orderId, "Order ID cannot be null");
         Objects.requireNonNull(paymentGateway, "Payment gateway cannot be null");
 
-        var orderOpt = coffeeShop.getOrders().stream()
-                .filter(o -> o.getOrderId().equals(orderId))
-                .findFirst();
+        var orderOpt = orderService.findByOrderId(orderId);
 
         if (orderOpt.isEmpty()) {
             sendSystemMessage(session.id(), "Order #" + orderId + " not found.");
@@ -467,6 +476,7 @@ public class ChatService {
                 "You are now connected. Barista ID: " + session.baristaId());
 
         // User-scoped notification for the customer specifically
+        assert session.baristaId() != null;
         notificationService.notifySessionMatched(session.customerId(), session.baristaId(), session.id());
     }
 
@@ -481,8 +491,17 @@ public class ChatService {
      */
     public @NotNull List<Order> getCoffeeShopOrdersForCustomer(long customerUserId) {
         String customerId = "CUST-" + customerUserId;
-        return coffeeShop.getOrders().stream()
-                .filter(o -> o.getCustomer().getId().equals(customerId))
-                .toList();
+        return orderService.findByCustomerId(customerId);
+    }
+
+    /**
+     * Returns a snapshot of the kitchen queue's fill level, for display purposes
+     * (e.g. {@code BaristaView}/{@code BaristaController}'s dashboard), or {@code null}
+     * if the shop isn't open.
+     *
+     * @return the queue snapshot, or {@code null}
+     */
+    public OrderService.@Nullable QueueSnapshot getKitchenQueueSnapshot() {
+        return orderService.getQueueSnapshot();
     }
 }

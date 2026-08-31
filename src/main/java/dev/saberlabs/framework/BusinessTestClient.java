@@ -56,7 +56,9 @@ public class BusinessTestClient {
         }
 
         @Override
-        public void processRequest(String request) {}
+        public void processRequest(String request) {
+            System.out.println("BookStoreBusiness handling unknown request: " + request);
+        }
     }
 
 
@@ -75,7 +77,9 @@ public class BusinessTestClient {
         }
 
         @Override
-        public void processRequest(String request) {}
+        public void processRequest(String request) {
+            System.out.println("OnlineShopBusiness handling unknown request: " + request);
+        }
     }
 
 }

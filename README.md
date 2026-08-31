@@ -1,123 +1,115 @@
-# Coffee Chat
+# Welcome to My Framework
 ***
 
 ## Task
-Build a coffee shop ordering and support-chat application on a foundation of sound
-object-oriented design: ten classic Gang-of-Four design patterns cooperating inside one cohesive
-system rather than existing as isolated textbook snippets, safe concurrent order fulfillment,
-a real chat-based ordering flow backed by persistent storage, a JavaFX desktop client alongside a
-console client, a small reusable reflection-based framework for dispatching client interactions
-to the right handler at runtime, an automated test suite with an enforced coverage floor, and a
-self-contained packaged build a reviewer can run without a development environment.
+Up to now, every step of this project added a new feature to the coffee shop app. This step is
+different. Instead of adding a feature, the task is to build a small, reusable framework, not
+tied to coffee shops only, that lets any business type say which of its methods should handle
+which kind of client request, just by adding annotations. A dispatcher then finds and calls the
+right method at runtime using Java reflection, instead of a hardcoded `if` or `switch`. The real
+challenge is not the coffee shop logic, since that already exists. It's designing the framework's
+contract (`BusinessObject`), its meta-annotation (`@RequestMappingMeta`), the real annotations
+built on top of it (`@OrderHandler` and `@ChatHandler`), and the dispatcher
+(`InteractionHandler`), then making the coffee shop app actually use it, without writing a
+second, parallel copy of logic that already exists.
+
+### Quick reminder of the previous steps
+
+- **Design Patterns step**: build all 10 assigned GoF patterns for real, working together in one
+  app instead of separate textbook examples. See
+  [`DESIGN-PATTERNS-README.md`](docs/DESIGN-PATTERNS-README.md).
+
+- **Multithreading step**: let many customers place orders at the same time while baristas
+  prepare them in the background, using a thread safe order queue. See
+  [`MULTITHREADING-README.md`](docs/MULTITHREADING-README.md).
+
+- **Coffee Chat step**: add a real chat feature. Orders are placed through conversation and paid
+  for as a separate step, everything saved through a handwritten JDBC layer, then wrapped in a
+  JavaFX desktop app on top of the console app. See
+  [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md).
+
+- **It Works On My Machine step**: add a real JUnit 5 and Mockito test suite across order
+  processing, chat, and the database, then enforce an 80% per-package coverage floor with JaCoCo
+  so the suite can't quietly rot. See
+  [`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md).
+
+- **Package It step**: turn everything built so far into one self-contained, runnable jar built
+  with Maven, with test and coverage reports generated automatically. See
+  [`PACKAGE-IT-README.md`](docs/PACKAGE-IT-README.md).
+
+- **My Framework step (this one)**: build the small reflection based framework described above,
+  and make the coffee shop app actually use it for real chat traffic, not just a demo.
 
 ## Description
 
-### Overview
-A customer logs in, starts a chat session, and is matched with a barista. From there, ordering
-happens through conversation — typing `/order espresso milk` places a real order; anything else is
-just a message. Baristas prepare drinks concurrently on a bounded worker-thread pipeline, orders
-move through preparation, fulfillment, and payment, and loyalty tiers update automatically as
-customers order more. Everything is persisted to SQLite, so sessions, messages, and order history
-survive a restart. The same backend drives both a JavaFX desktop UI and a console client.
-
-### Design patterns
-| Pattern | Where |
+### The pieces
+| Class / Annotation | What it does |
 |---|---|
-| Singleton | `singleton.CoffeeShop` — the single in-memory registry of live orders |
-| Factory Method | `factory.CoffeeCreator` and its `Espresso`/`Cappuccino`/`Latte` creators |
-| Decorator | `decorator.CoffeeDecorator` and its `Milk`/`Sugar`/`WhippedCream` decorators |
-| Prototype | `prototype.CloneableCoffee`/`CloneableOrder` — cloning an order for a reorder |
-| Template Method | `template.CoffeePreparationTemplate` and its per-coffee preparation steps |
-| Strategy | `strategy.PricingStrategy` — loyalty-tier-based pricing, resolved from the customer |
-| Observer | `observer.OrderObserver`/`Observable` (order status) and `chat.ChatObserver`/`NotificationObserver` (chat/notifications) |
-| Command | `command.Command` and its `PlaceOrder`/`Prepare`/`Pay`/`FulfillOrderCommand`s, run through `OrderInvoker` with undo support |
-| Adapter | `adapter.PaymentGateway` and its `PayPal`/`Stripe`/`CashPaymentAdapter`s |
-| Facade | `facade.CoffeeShopFacade` — a single, simple entry point over `order.OrderService` |
+| `BusinessObject` | The interface every business type implements. `processRequest(String)` is the fallback method, called when no annotated method matches the request |
+| `RequestType` | An enum of the known request types: `ORDER` and `CHAT` |
+| `RequestMappingMeta` | A meta-annotation. It marks another annotation as a handler annotation and stores which `RequestType` it stands for |
+| `OrderHandler` / `ChatHandler` | The real annotations you put on a method, each built on top of `RequestMappingMeta` |
+| `InteractionHandler` | Looks through a business object's methods with reflection and calls the one whose annotation matches the request |
+| `ReflectionUtil` | Actually calls the matched method by its name, and lets any error it throws reach the caller instead of hiding it |
+| `BusinessTestClient` | A small runnable demo with two toy business types, a bookstore and an online shop |
 
-See [`DESIGN-PATTERNS-README.md`](docs/DESIGN-PATTERNS-README.md) for a deeper walkthrough of each.
+### How a request flows through the framework, in the real app
+This is what actually happens when a customer types something in the chat and hits send.
 
-### Application layer
-`order.OrderService` is the sole application-layer owner of the `CoffeeShop` singleton: shop
-lifecycle, order placement/processing/reordering, undo, and queries all go through it, so no other
-class talks to the singleton directly. `facade.CoffeeShopFacade` is a thin, one-directional Facade
-over `OrderService` — it holds no order logic of its own. `chat.ChatService` depends on
-`OrderService` the same way, so a chat-placed order runs through the exact same Command pipeline
-as any other order.
+1. `CustomerController` (or the console app) reads the text the customer typed. It hands that
+   text to `ChatService.processCustomerInput`, along with who the customer is and which chat
+   session they're in.
+2. `ChatService` builds a new `CoffeeShopBusiness` object. A fresh one is built for every single
+   message, and it remembers the customer and the session, so it always knows who is asking.
+3. `ChatService` calls `InteractionHandler.handleInteraction(business, text)`, passing that new
+   business object and the raw text the customer typed.
+4. `InteractionHandler` looks at the first word of the text. If it's exactly `/order`, the request
+   type is "order". Otherwise it's "chat". This is the only decision the framework makes on its
+   own.
+5. `InteractionHandler` uses reflection to find the method on `CoffeeShopBusiness` annotated with
+   `@OrderHandler` or `@ChatHandler` that matches, and calls it.
+6. `CoffeeShopBusiness.handleOrder` or `handleChat` runs. These methods just call straight back
+   into `ChatService`, which does the real work: parsing the coffee type and any extras, placing
+   the order, saving the chat message, and building the reply.
+7. `ChatService.processCustomerInput` returns that reply, and the chat window shows it.
 
-### Concurrency
-`multithread.OrderQueue` is a bounded, thread-safe producer/consumer queue: chat baristas enqueue
-orders, a configurable pool of `Barista` worker threads drains it concurrently, each running an
-order through its full preparation lifecycle. Shared mutable state (order counters, loyalty tiers,
-the singleton's order list) is synchronized so concurrent order placement can't corrupt it — see
-[`MULTITHREADING-README.md`](docs/MULTITHREADING-README.md).
+So the framework's job stops at step 4, deciding if the message is an order or plain chat.
+Everything after that, like understanding "espresso" and "milk", is normal coffee shop logic that
+lives in `ChatService`, not in the framework.
 
-### Chat, persistence, and the UI
-`chat.ChatService` coordinates barista-pool session matching, message persistence, and order
-placement via chat commands. Sessions, messages, image uploads, notifications, and orders are all
-persisted through a handwritten JDBC layer (`chat.repositories`, `auth.repositories`, `db`) backed
-by SQLite; an in-memory implementation of each repository interface exists for fast,
-database-free tests. `dev.saberlabs.CoffeeChatAppCLI` is the console client; `fx.AppContext` wires
-the same backend into a JavaFX desktop client (`dev.saberlabs.CoffeeChatAppFX`) with chat bubbles,
-image sharing, and separate customer/barista/manager windows. Full details in
-[`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md).
+### Why `/order` and not just "order"
+At first, the framework checked whether the message started with the word "order". That doesn't
+work well, because a normal sentence can start with that same word too. For example, "order latte
+from this place was amazing" looks like an order for a latte with a few strange extras, but it's
+really just a compliment. There's no simple rule that can always tell a real order apart from a
+sentence that happens to use the word "order". So instead, the framework looks for an exact
+marker, `/order`, the same way chat apps like Discord or Slack use `/command` to mean "this is a
+command, not a normal message". A normal sentence would never start with a slash, so this removes
+the confusion completely instead of trying to guess.
 
-### The reflection framework
-`dev.saberlabs.framework` lets any business type declare, purely with annotations, which of its
-methods handles which kind of client interaction, and dispatches to the right one at runtime via
-`java.lang.reflect` instead of a hardcoded `if`/`switch`:
-
-| Class / Annotation | Role |
-|---|---|
-| `BusinessObject` | Interface every business type implements: `void processRequest(String request)` is the default/fallback handler |
-| `annotation.RequestType` | Enum of known request types: `ORDER`, `CHAT` |
-| `annotation.RequestMappingMeta` | Meta-annotation marking another annotation as a request-handler annotation, carrying the `RequestType` it routes |
-| `annotation.OrderHandler` / `ChatHandler` | Concrete, method-level annotations built on `RequestMappingMeta` |
-| `reflection.InteractionHandler` | Reflects over a `BusinessObject`'s methods to find and invoke the one whose annotation matches the request type |
-| `reflection.ReflectionUtil` | Invokes a matched method by name, propagating any failure to the caller |
-| `BusinessTestClient` | Runnable demo of the assignment's literal shape, with two toy business types |
-
-`dev.saberlabs.chat.CoffeeShopBusiness` is the one real `BusinessObject` for this application — a
-`BusinessObject` stands for a single business, so there's exactly one, the same way the demo's
-`BookStoreBusiness`/`OnlineShopBusiness` are each exactly one. `ChatService` constructs a fresh,
-request-scoped instance for every customer message and dispatches through `InteractionHandler`,
-which makes exactly one judgment call: does the message's first token equal `/order`? An explicit
-marker — rather than guessing from a bare `"order"` prefix — is what lets `InteractionHandler`
-tell a real command apart from a sentence that merely mentions ordering ("order latte from this
-place was amazing" is a compliment, not a latte with four unrecognized extras). Every decision
-past that — parsing the coffee type and extras, placing the order, wording the reply — is ordinary
-business logic in `CoffeeShopBusiness`'s handler methods, which call straight into `ChatService`;
-the framework itself stays fully generic and reusable for a different kind of business. See
-[`framework/doc.md`](src/main/java/dev/saberlabs/framework/doc.md) for the full design rationale.
-
-### Testing
-A JUnit 5 + Mockito suite covers order processing, chat, authentication, database interactions,
-concurrency, and the reflection framework, isolating units from collaborators they don't own while
-using real SQLite/in-memory fakes wherever that's more informative than a mock. JaCoCo enforces an
-80% per-package line-coverage floor so the suite can't quietly rot. See
-[`IT-WORKS-ON-MY-MACHINE-README.md`](docs/IT-WORKS-ON-MY-MACHINE-README.md).
-
-### Packaging
-`maven-shade-plugin` builds one self-contained, executable JAR (`dev.saberlabs.CoffeeShopApp` as
-entry point), with HTML test and coverage reports generated alongside it — nothing beyond a JVM is
-needed to run or review the build. See [`PACKAGE-IT-README.md`](docs/PACKAGE-IT-README.md).
+### Is `CoffeeShopFacade` the `BusinessObject`? No.
+`CoffeeShopFacade` was considered for this role at one point, but a `BusinessObject` should
+represent one single business, not a class picked just because it happened to have some order
+logic in it. The real `BusinessObject` for this app is `dev.saberlabs.chat.CoffeeShopBusiness`, a
+small class that only exists to be dispatched into. It's built fresh for every chat message and
+calls back into `ChatService` to do the actual work. `CoffeeShopFacade` stays a plain Facade over
+`OrderService`, with no framework role at all.
 
 ### Design notes
-- `InteractionHandler` re-scans a `BusinessObject`'s methods on every call rather than caching a
-  `requestType → Method` registry. A real high-traffic framework (Spring MVC, JAX-RS) would build
-  that registry once at startup; a linear per-call scan is simpler and entirely adequate at this
-  project's scale.
-- Handler methods take exactly one `String` parameter, so anything beyond free text has to be
-  parsed out of it inside the handler (see `CoffeeShopBusiness.handleOrder`'s coffee-type/extras
-  parsing). This is also why order placement/kitchen routing inside `ChatService` call
-  `OrderService` directly rather than through `InteractionHandler`: by that point the exact method
-  needed is already known, so reflective dispatch would only add indirection, not remove work —
-  reflection is reserved for the one place a caller genuinely doesn't know what it's holding yet.
-- `BookStoreBusiness`/`OnlineShopBusiness` in `BusinessTestClient` are intentionally demo-only
-  scaffolding with no dedicated tests: they exist to prove the framework dispatches identically
-  for any business type, not to be real implementations.
+- `InteractionHandler` looks through all of a business object's methods every time it's called,
+  instead of remembering them after the first time. This is simple and works fine at this
+  project's size. A bigger framework, like Spring, would build that list once when the app starts.
+- Handler methods take one `String` and nothing else. Anything more detailed has to be pulled out
+  of that string inside the method. This is also why `ChatService` calls `OrderService` directly
+  for placing orders and sending them to the kitchen, instead of going through the framework: by
+  that point it already knows exactly which method to call, so reflection wouldn't save any work.
+- `BookStoreBusiness` and `OnlineShopBusiness` inside `BusinessTestClient` only exist to show that
+  the framework works for other kinds of businesses too. They don't have their own tests, because
+  they aren't meant to be real implementations.
 
 ## Installation
-Requires **JDK 25+** and **Maven**.
+Requires **JDK 25+** and **Maven**. Same repository as the previous steps, no new dependencies to
+install manually.
 
 ```bash
 git clone https://github.com/devbossma/Qwasar-Silicon-Valley-My-Design-Pattern.git
@@ -127,15 +119,6 @@ mvn clean install
 
 ## Usage
 
-### Running the application
-```bash
-mvn javafx:run
-```
-launches the JavaFX desktop client. For the console client, run
-`dev.saberlabs.CoffeeChatAppCLI`'s `main()` from your IDE, or via
-`mvn exec:java`. See [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md) and
-[`PACKAGE-IT-README.md`](docs/PACKAGE-IT-README.md) for running the packaged JAR.
-
 ### Running the framework demo
 ```bash
 mvn compile
@@ -143,20 +126,27 @@ mvn dependency:build-classpath -Dmdep.outputFile=cp.txt
 java -cp "target/classes;%cp.txt%" dev.saberlabs.framework.BusinessTestClient   # Windows
 java -cp "target/classes:$(cat cp.txt)" dev.saberlabs.framework.BusinessTestClient  # macOS/Linux
 ```
-Or run `BusinessTestClient.main()` directly from your IDE.
+Or just run `BusinessTestClient.main()` directly from your IDE, it's a plain Java class with a
+`main()` method, no special run configuration needed.
+
+### Running the coffee shop app
+Unchanged from the previous steps, see [`PACKAGE-IT-README.md`](docs/PACKAGE-IT-README.md) for
+building and running the packaged jar, or [`COFFEE-CHAT-README.md`](docs/COFFEE-CHAT-README.md)
+for the CLI and JavaFX walkthroughs. Every real chat message you type goes through the framework
+now, the way it's described above.
 
 ### Running the tests
 ```bash
 mvn test
 ```
-Generates a coverage report at `target/site/jacoco/index.html` and a test report at
-`target/site/surefire-report.html`.
+Runs the full suite and generates a coverage report at `target/site/jacoco/index.html` and a test
+report at `target/site/surefire-report.html`.
 
 ### Enforcing the coverage gate
 ```bash
 mvn verify
 ```
-Runs the full suite **and** fails the build if any (non-excluded) package falls below 80% line
+Runs the full suite and fails the build if any (non-excluded) package falls below 80% line
 coverage.
 
 ### The Core Team

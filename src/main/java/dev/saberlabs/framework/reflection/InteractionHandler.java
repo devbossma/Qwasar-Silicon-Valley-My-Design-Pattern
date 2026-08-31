@@ -35,13 +35,23 @@ public class InteractionHandler {
      * Classifies the raw request text — the only judgment call this framework makes on the
      * caller's behalf — then dispatches exactly like {@link #handleInteraction(BusinessObject, String, String)}.
      * <p>
-     * The classification itself is deliberately minimal and generic: does the text's first
-     * whitespace-delimited token equal {@code "/order"}, exactly? Any business that takes orders
-     * through a chat-style text channel needs this same yes/no split before it can act, so it
-     * belongs here rather than being reimplemented by every {@link BusinessObject}. Everything
-     * past that one decision — what an order actually looks like, what a reply should say — is
-     * real business logic, and stays in the business object's own handler methods, not in this
-     * class.
+     * The classification itself is deliberately minimal and generic, and it's purely syntactic —
+     * no business vocabulary involved:
+     * <ul>
+     *   <li>the text's first whitespace-delimited token equals {@code "/order"}, exactly ->
+     *       {@code "order"}</li>
+     *   <li>the first token starts with {@code "/"} but isn't {@code "/order"} -> the raw token
+     *       itself, e.g. {@code "/menu"}. No {@link RequestType} will ever resolve to that, so
+     *       this always falls through to {@link BusinessObject#processRequest(String)} below —
+     *       a business object gets a real chance to respond to a command it doesn't recognize,
+     *       instead of the text silently being treated as a chat message</li>
+     *   <li>anything else -> {@code "chat"}</li>
+     * </ul>
+     * Any business that takes orders through a chat-style text channel needs this same split
+     * before it can act, so it belongs here rather than being reimplemented by every
+     * {@link BusinessObject}. Everything past that — what an order actually looks like, what a
+     * reply should say, which commands (if any) it recognizes — is real business logic, and
+     * stays in the business object's own handler methods, not in this class.
      * <p>
      * An explicit marker (rather than a bare {@code "order"} prefix) is deliberate: free-form
      * chat text can legitimately start with a real word that reads like a command — "order latte
@@ -57,7 +67,16 @@ public class InteractionHandler {
         Objects.requireNonNull(request, "Request cannot be null");
         String trimmed = request.trim();
         String firstToken = trimmed.split("\\s+", 2)[0];
-        String requestType = firstToken.equalsIgnoreCase(ORDER_MARKER) ? "order" : "chat";
+
+        String requestType;
+        if (firstToken.equalsIgnoreCase(ORDER_MARKER)) {
+            requestType = "order";
+        } else if (firstToken.startsWith("/")) {
+            requestType = firstToken;
+        } else {
+            requestType = "chat";
+        }
+
         handleInteraction(businessObject, requestType, request);
     }
 

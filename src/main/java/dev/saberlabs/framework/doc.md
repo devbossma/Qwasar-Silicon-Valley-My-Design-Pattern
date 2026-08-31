@@ -58,7 +58,11 @@ assignment's own demo makes this explicit (`BookStoreBusiness`, `OnlineShopBusin
         InteractionHandler
         ─────────────────────────────────────────
         + handleInteraction(BusinessObject, request)
-              └─ classifies request: first token == "/order"? -> "order" : "chat"
+              └─ classifies request, first token of the text:
+                    == "/order"        -> "order"
+                    starts with "/"    -> the token itself (e.g. "/menu") -- never a real
+                                          RequestType, so this always falls through below
+                    anything else      -> "chat"
               └─ delegates to the 3-arg overload below
         + handleInteraction(BusinessObject, requestType, request)
               └─ resolves requestType -> RequestType (or falls back on failure)
@@ -81,7 +85,10 @@ assignment's own demo makes this explicit (`BookStoreBusiness`, `OnlineShopBusin
                     -> ChatService.handleOrderCommand(user, session, text)
               @ChatHandler  void handleChat(String message)
                     -> ChatService.sendMessage(session.id(), user.id(), user.username(), message)
-              processRequest(String) -> unreachable no-op (classification is always order/chat)
+              processRequest(String)
+                    -> reached for any "/" command other than "/order" (e.g. "/menu", a typo
+                       like "/odrer espresso") -> ChatService.sendMessage(..., SYSTEM_MESSAGE)
+                       with a real "unknown command, try /order ..." reply
 ```
 
 ### Key Classes
@@ -119,18 +126,31 @@ loop itself never changes.
 
 Most callers already know what kind of request they're building. The one case where they don't is
 a customer's raw chat input — plain small talk and an order command arrive as the same `String`,
-and the caller has to decide which before it can act. That single yes/no decision is common to any
-business that takes orders through a chat-style text channel, so it lives in
+and the caller has to decide which before it can act. That decision is common to any business
+that takes orders through a chat-style text channel, so it lives in
 `InteractionHandler.handleInteraction(BusinessObject, String)` rather than being reimplemented by
 every `BusinessObject`:
 
 ```java
 public void handleInteraction(BusinessObject businessObject, String request) {
     String firstToken = request.trim().split("\\s+", 2)[0];
-    String requestType = firstToken.equalsIgnoreCase("/order") ? "order" : "chat";
+
+    String requestType;
+    if (firstToken.equalsIgnoreCase("/order")) {
+        requestType = "order";
+    } else if (firstToken.startsWith("/")) {
+        requestType = firstToken;   // no RequestType will ever match -> falls to processRequest
+    } else {
+        requestType = "chat";
+    }
+
     handleInteraction(businessObject, requestType, request);
 }
 ```
+
+The check stays purely syntactic — "does the first token equal `/order`?" and "does it start with
+`/` at all?" — no coffee-shop vocabulary involved, so it's just as valid for a bookstore or an
+online shop.
 
 **Why a `/order` marker, not an `"order"` prefix.** An earlier version of this checked whether the
 text merely *started with* "order". That misfires twice over: "orderly service today!" isn't an
@@ -153,12 +173,27 @@ hypothetical other business (a bookstore has entirely different order syntax).
 
 If `requestType` doesn't resolve to a known `RequestType`, or no method on the business object
 claims the resolved type, `InteractionHandler` calls `businessObject.processRequest(request)`
-instead of just giving up. For `CoffeeShopBusiness` specifically, the classification is binary
-(order or chat) and both are always annotated, so `processRequest` is unreachable in normal
-operation — it's kept only to satisfy the contract, exactly like `BookStoreBusiness`/
-`OnlineShopBusiness`'s own empty implementation in the demo. It's a real, exercised part of the
-contract for a `BusinessObject` that (like the demo's toy `CoffeeShopBusiness`) has a third,
-unmapped request type.
+instead of just giving up. `CoffeeShopBusiness.processRequest` is reached for real: any `"/"`
+command other than `"/order"` (a typo like `"/odrer espresso"`, or a genuinely unsupported
+command like `"/menu"`) lands here, since no `RequestType` ever matches that text. Rather than
+letting a mistyped or unsupported command silently pass through as plain chat, it sends the
+customer a real reply through `ChatService`, naming the command it received and pointing them at
+the one it does support:
+
+```java
+@Override
+public void processRequest(String request) {
+    String firstToken = request.trim().split("\\s+", 2)[0];
+    String reply = "Unknown command: " + firstToken
+            + ". Try /order <coffee> [extras], e.g. /order espresso milk.";
+    chatService.sendMessage(session.id(), 0, "System", reply, MessageType.SYSTEM_MESSAGE, null);
+}
+```
+
+`BookStoreBusiness`/`OnlineShopBusiness` in the demo still leave `processRequest` empty — that's a
+valid choice too, a business is free to just ignore a command it doesn't recognize instead of
+replying to it. `CoffeeShopBusiness` replying is a real design choice, not something the framework
+requires.
 
 ### Failures propagate, they aren't swallowed
 

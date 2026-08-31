@@ -68,11 +68,17 @@ class CoffeeShopBusinessTest {
     }
 
     @Test
-    @DisplayName("processRequest is an unreachable no-op fallback, kept only to satisfy the BusinessObject contract")
-    void processRequestIsNoOp() {
+    @DisplayName("processRequest sends a real, helpful SYSTEM_MESSAGE naming the command it received")
+    void processRequestSendsHelpfulSystemMessage() {
         CoffeeShopBusiness business = new CoffeeShopBusiness(chatService, aliceUser, session);
 
-        assertDoesNotThrow(() -> business.processRequest("anything"));
+        business.processRequest("/menu");
+
+        assertEquals(MessageType.SYSTEM_MESSAGE, business.result().type());
+        assertTrue(business.result().content().contains("/menu"));
+        assertTrue(business.result().content().contains("/order"));
+        assertEquals(1, chatService.loadHistory(session.id()).size());
+        assertTrue(orderService.getAllOrders().isEmpty());
     }
 
     @Test
@@ -143,6 +149,20 @@ class CoffeeShopBusinessTest {
 
             assertTrue(orderService.getAllOrders().isEmpty());
             assertEquals(1, chatService.loadHistory(session.id()).size());
+        }
+
+        @Test
+        @DisplayName("the auto-classifying overload routes an unrecognized \"/\" command to "
+                + "processRequest, which replies with a real, helpful SYSTEM_MESSAGE")
+        void autoClassifiedUnknownCommandGetsHelpfulReply() {
+            CoffeeShopBusiness business = new CoffeeShopBusiness(chatService, aliceUser, session);
+
+            handler.handleInteraction(business, "/odrer espresso");
+
+            assertTrue(orderService.getAllOrders().isEmpty());
+            ChatMessage reply = chatService.loadHistory(session.id()).get(0);
+            assertEquals(MessageType.SYSTEM_MESSAGE, reply.type());
+            assertTrue(reply.content().contains("/odrer"));
         }
     }
 }

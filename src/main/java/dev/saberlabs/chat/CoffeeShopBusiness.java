@@ -13,9 +13,10 @@ import java.util.Objects;
  *
  * The real, working counterpart to {@code BusinessTestClient}'s toy {@code CoffeeShopBusiness}
  * demo: {@link #handleOrder} and {@link #handleChat} place a real order / send a real chat
- * message through the real {@link ChatService}, instead of appending to a {@code List<String>}.
- * This is the one {@code BusinessObject} for the whole application — a business object stands
- * for a single business, so there's exactly one, matching {@code BookStoreBusiness}/
+ * message through the real {@link ChatService}, and {@link #processRequest} sends a real reply
+ * for an unrecognized {@code "/"} command — none of the three appends to a {@code List<String>}
+ * or is a no-op. This is the one {@code BusinessObject} for the whole application — a business
+ * object stands for a single business, so there's exactly one, matching {@code BookStoreBusiness}/
  * {@code OnlineShopBusiness}'s own shape in the demo.
  * <p>
  * {@link ChatService#processCustomerInput} constructs a fresh instance of this class for every
@@ -63,16 +64,23 @@ final class CoffeeShopBusiness implements BusinessObject {
     }
 
     /**
-     * The classification {@link dev.saberlabs.framework.reflection.InteractionHandler} makes is
-     * binary (order or chat) and this class annotates both, so this fallback is unreachable in
-     * normal operation — kept only to satisfy the {@link BusinessObject} contract, matching
-     * {@code BookStoreBusiness}/{@code OnlineShopBusiness}'s own empty implementation in the demo.
+     * The real fallback handler — reached whenever the customer's text starts with a {@code "/"}
+     * command this business doesn't recognize (only {@code /order} is annotated above). Rather
+     * than silently treating a mistyped or unsupported command as an ordinary chat message,
+     * this sends a real reply back through {@link ChatService} explaining the one command this
+     * business actually supports.
      *
-     * @param request the request with no dedicated handler
+     * @param request the raw text, e.g. {@code "/menu"} or a typo like {@code "/odrer espresso"}
      */
     @Override
     public void processRequest(String request) {
+        String firstToken = request.trim().split("\\s+", 2)[0];
+        String reply = "Unknown command: " + firstToken
+                + ". Try /order <coffee> [extras], e.g. /order espresso milk.";
+        result = chatService.sendMessage(session.id(), 0, "System", reply,
+                MessageType.SYSTEM_MESSAGE, null);
     }
+
 
     /**
      * The {@link ChatMessage} produced by whichever handler ran, for {@link ChatService} to

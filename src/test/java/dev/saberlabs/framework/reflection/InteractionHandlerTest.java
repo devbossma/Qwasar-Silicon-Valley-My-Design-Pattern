@@ -90,12 +90,25 @@ class InteractionHandlerTest {
         }
 
         @Test
-        @DisplayName("a word merely starting with the marker (\"/ordering\") is not a false positive either")
+        @DisplayName("a word merely starting with the marker (\"/ordering\") is not a false positive either "
+                + "(routes to processRequest, not @OrderHandler or @ChatHandler)")
         void wordStartingWithMarkerIsNotMisclassifiedAsAnOrder() {
             handler.handleInteraction(target, "/ordering my thoughts here, what a mess");
 
-            assertEquals(List.of("/ordering my thoughts here, what a mess"), target.chatCalls);
+            assertEquals(List.of("/ordering my thoughts here, what a mess"), target.processedRequests);
             assertTrue(target.orderCalls.isEmpty());
+            assertTrue(target.chatCalls.isEmpty());
+        }
+
+        @Test
+        @DisplayName("any \"/\" command other than \"/order\" falls back to processRequest, "
+                + "instead of being silently treated as a chat message")
+        void unrecognizedSlashCommandFallsBackToProcessRequest() {
+            handler.handleInteraction(target, "/menu");
+
+            assertEquals(List.of("/menu"), target.processedRequests);
+            assertTrue(target.orderCalls.isEmpty());
+            assertTrue(target.chatCalls.isEmpty());
         }
     }
 

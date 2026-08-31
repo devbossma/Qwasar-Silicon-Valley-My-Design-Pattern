@@ -64,18 +64,23 @@ This is what actually happens when a customer types something in the chat and hi
 3. `ChatService` calls `InteractionHandler.handleInteraction(business, text)`, passing that new
    business object and the raw text the customer typed.
 4. `InteractionHandler` looks at the first word of the text. If it's exactly `/order`, the request
-   type is "order". Otherwise it's "chat". This is the only decision the framework makes on its
-   own.
+   type is "order". If it starts with `/` but isn't `/order`, like `/menu` or a typo such as
+   `/odrer`, the request type is just that word as-is. Anything else is "chat". This is the only
+   decision the framework makes on its own.
 5. `InteractionHandler` uses reflection to find the method on `CoffeeShopBusiness` annotated with
-   `@OrderHandler` or `@ChatHandler` that matches, and calls it.
-6. `CoffeeShopBusiness.handleOrder` or `handleChat` runs. These methods just call straight back
-   into `ChatService`, which does the real work: parsing the coffee type and any extras, placing
-   the order, saving the chat message, and building the reply.
+   `@OrderHandler` or `@ChatHandler` that matches. For `/order`, that's `handleOrder`. For plain
+   text, that's `handleChat`. For any other `/` command, nothing matches, since only `/order` has
+   an annotation, so it falls back to `processRequest` instead.
+6. Whichever method runs calls straight back into `ChatService`, which does the real work. For an
+   order: parsing the coffee type and extras, placing it, and building the reply. For chat: saving
+   the message. For an unknown command: sending back a reply that names the command and points the
+   customer at `/order`, instead of just letting it slide past as an ordinary message.
 7. `ChatService.processCustomerInput` returns that reply, and the chat window shows it.
 
-So the framework's job stops at step 4, deciding if the message is an order or plain chat.
-Everything after that, like understanding "espresso" and "milk", is normal coffee shop logic that
-lives in `ChatService`, not in the framework.
+So the framework's job stops at step 4, deciding if the message is an order, a command it doesn't
+know, or plain chat. Everything after that, like understanding "espresso" and "milk", or wording
+a reply, is normal coffee shop logic that lives in `ChatService` and `CoffeeShopBusiness`, not in
+the framework.
 
 ### Why `/order` and not just "order"
 At first, the framework checked whether the message started with the word "order". That doesn't

@@ -1,4 +1,4 @@
-package dev.saberlabs.framework.example.annotation;
+package dev.saberlabs.framework.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Pattern 11: REFLECTION FRAMEWORK — EXAMPLE (Meta-annotation)
+ * Pattern 11: REFLECTION FRAMEWORK (Meta-annotation)
  *
  * Marks another annotation as a request-handler annotation, carrying the
  * {@link RequestType} it routes. {@code InteractionHandler} only considers

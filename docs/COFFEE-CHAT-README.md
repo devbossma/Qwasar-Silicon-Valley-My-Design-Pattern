@@ -180,7 +180,7 @@ Or via IntelliJ: right-click `CoffeeChatAppCLI` → Run.
   No messages yet in this session.
 
   Commands:
-    order <coffee> [extras]   e.g. order cappuccino milk sugar
+    /order <coffee> [extras]  e.g. /order cappuccino milk sugar
     pay                       pay for a READY order
     history                   show this session's messages
     back                      return to menu (session stays open)
@@ -314,7 +314,7 @@ Return to login screen? (y/n): y
   [01:36] ⚙️ System: Order #ORD-1 sent to the kitchen!
 
   Commands:
-    order <coffee> [extras]   e.g. order cappuccino milk sugar
+    /order <coffee> [extras]  e.g. /order cappuccino milk sugar
     pay                       pay for a READY order
     history                   show this session's messages
     back                      return to menu (session stays open)

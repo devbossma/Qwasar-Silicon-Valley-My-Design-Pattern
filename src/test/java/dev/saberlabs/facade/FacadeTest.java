@@ -5,22 +5,11 @@ import dev.saberlabs.adapter.CashPaymentService;
 import dev.saberlabs.adapter.PayPalAdapter;
 import dev.saberlabs.adapter.PayPalPaymentService;
 import dev.saberlabs.adapter.PaymentGateway;
-import dev.saberlabs.chat.BaristaQueue;
-import dev.saberlabs.chat.ChatMessage;
-import dev.saberlabs.chat.ChatNotificationService;
-import dev.saberlabs.chat.ChatService;
-import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatNotificationRepository;
-import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatOrderRepository;
-import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatRepository;
-import dev.saberlabs.chat.repositories.implementations.memory.InMemoryChatSessionRepository;
 import dev.saberlabs.decorator.MilkDecorator;
 import dev.saberlabs.factory.CappuccinoCreator;
 import dev.saberlabs.factory.CoffeeCreator;
 import dev.saberlabs.factory.EspressoCreator;
 import dev.saberlabs.factory.LatteCreator;
-import dev.saberlabs.framework.business.ChatDetails;
-import dev.saberlabs.framework.business.FeedbackDetails;
-import dev.saberlabs.framework.business.OrderDetails;
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Espresso;
@@ -31,7 +20,6 @@ import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.order.OrderService;
 import dev.saberlabs.singleton.CoffeeShop;
 
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,7 +35,6 @@ class FacadeTest {
 
     private CoffeeShopFacade facade;
     private OrderService orderService;
-    private ChatService chatService;
     private PaymentGateway paymentGateway;
     private Customer alice;
     private Customer bob;
@@ -58,28 +45,12 @@ class FacadeTest {
         PayPalPaymentService paypalService = new PayPalPaymentService("shop@mail.com", "pass");
         paymentGateway = new PayPalAdapter(paypalService);
         orderService = new OrderService(paymentGateway);
-        chatService = buildChatService(orderService);
-        facade = new CoffeeShopFacade(orderService, chatService);
+        facade = new CoffeeShopFacade(orderService);
 
         alice = new Customer("C001", "Alice");
         bob = new Customer("C002", "Bob");
         facade.registerCustomer(alice);
         facade.registerCustomer(bob);
-    }
-
-    /**
-     * A lightweight, in-memory-repo-backed ChatService — CoffeeShopFacade always composes a
-     * real one now (it's the BusinessObject's real handleChat target), so every test that needs
-     * a Facade needs one of these too, cheaply, with no database involved.
-     */
-    private static @NotNull ChatService buildChatService(@NotNull OrderService orderService) {
-        return new ChatService(
-                new InMemoryChatRepository(),
-                new InMemoryChatSessionRepository(),
-                new InMemoryChatOrderRepository(),
-                new ChatNotificationService(new InMemoryChatNotificationRepository()),
-                new BaristaQueue(),
-                orderService);
     }
 
     @Test
@@ -254,7 +225,7 @@ class FacadeTest {
         CashPaymentService cashService = new CashPaymentService();
         cashService.setAmountReceived(50.00);
         OrderService cashOrderService = new OrderService(new CashPaymentAdapter(cashService));
-        CoffeeShopFacade cashFacade = new CoffeeShopFacade(cashOrderService, buildChatService(cashOrderService));
+        CoffeeShopFacade cashFacade = new CoffeeShopFacade(cashOrderService);
         cashFacade.registerCustomer(alice);
 
         Order order = cashFacade.placeOrder(alice, new EspressoCreator(), "milk");
@@ -305,7 +276,7 @@ class FacadeTest {
             PaymentGateway mockGateway = mock(PaymentGateway.class);
             when(mockGateway.processPayment(anyString(), anyDouble())).thenReturn(false);
             OrderService mockOrderService = new OrderService(mockGateway);
-            CoffeeShopFacade mockedFacade = new CoffeeShopFacade(mockOrderService, buildChatService(mockOrderService));
+            CoffeeShopFacade mockedFacade = new CoffeeShopFacade(mockOrderService);
             mockedFacade.registerCustomer(alice);
 
             Order order = mockedFacade.placeOrder(alice, new EspressoCreator());
@@ -325,7 +296,7 @@ class FacadeTest {
             PaymentGateway mockGateway = mock(PaymentGateway.class);
             when(mockGateway.processPayment(anyString(), anyDouble())).thenReturn(true);
             OrderService mockOrderService = new OrderService(mockGateway);
-            CoffeeShopFacade mockedFacade = new CoffeeShopFacade(mockOrderService, buildChatService(mockOrderService));
+            CoffeeShopFacade mockedFacade = new CoffeeShopFacade(mockOrderService);
             mockedFacade.registerCustomer(alice);
 
             Order order = mockedFacade.placeOrder(alice, new EspressoCreator());
@@ -349,13 +320,7 @@ class FacadeTest {
         @Test
         @DisplayName("constructor rejects a null order service")
         void constructorRejectsNullOrderService() {
-            assertThrows(NullPointerException.class, () -> new CoffeeShopFacade(null, chatService));
-        }
-
-        @Test
-        @DisplayName("constructor rejects a null chat service")
-        void constructorRejectsNullChatService() {
-            assertThrows(NullPointerException.class, () -> new CoffeeShopFacade(orderService, null));
+            assertThrows(NullPointerException.class, () -> new CoffeeShopFacade(null));
         }
 
         @Test
@@ -452,53 +417,6 @@ class FacadeTest {
         }
     }
 
-    // ================================================================
-    // BusinessObject (reflection framework) handler methods — exercised
-    // directly here at the unit level; dev.saberlabs.framework.business.reflection.
-    // InteractionHandlerTest exercises the reflective dispatch path into these same methods.
-    // ================================================================
-
-    @Nested
-    @DisplayName("BusinessObject handler methods")
-    class BusinessObjectHandlerTests {
-
-        @Test
-        @DisplayName("processRequest is the default handler: a FeedbackDetails request is recorded in the feedback log")
-        void processRequestAppendsFeedbackToLog() {
-            facade.processRequest(new FeedbackDetails("Great service!"));
-
-            assertEquals(List.of("Great service!"), facade.getFeedbackLog());
-        }
-
-        @Test
-        @DisplayName("getFeedbackLog returns an empty list before any request is processed")
-        void getFeedbackLogStartsEmpty() {
-            assertTrue(facade.getFeedbackLog().isEmpty());
-        }
-
-        @Test
-        @DisplayName("handleOrder places the given, already-built order through the real OrderService")
-        void handleOrderPlacesRealOrder() {
-            Order order = new Order(alice, new EspressoCreator().createCoffee(), "ORD-EXTERNAL-1");
-
-            Order result = facade.handleOrder(new OrderDetails(order));
-
-            assertSame(order, result);
-            assertEquals(OrderStatus.PLACED, order.getStatus());
-            assertEquals(1, facade.getAllOrders().size());
-            assertEquals(1, facade.getInvoker().getCommandHistory().size());
-        }
-
-        @Test
-        @DisplayName("handleChat sends a real message through the real ChatService")
-        void handleChatSendsRealMessage() {
-            ChatMessage result = facade.handleChat(new ChatDetails(1L, 1L, alice.getName(), "Hello, barista!"));
-
-            assertEquals("Hello, barista!", result.content());
-            assertEquals(1, chatService.loadHistory(1L).size());
-        }
-    }
-
     @Nested
     @DisplayName("Payment gateway configuration")
     class PaymentGatewayConfigurationTests {
@@ -507,7 +425,7 @@ class FacadeTest {
         @DisplayName("an OrderService with no gateway still allows placing orders")
         void noGatewayAllowsPlacingOrders() {
             OrderService gatewayless = new OrderService();
-            CoffeeShopFacade gatewaylessFacade = new CoffeeShopFacade(gatewayless, buildChatService(gatewayless));
+            CoffeeShopFacade gatewaylessFacade = new CoffeeShopFacade(gatewayless);
 
             Order order = gatewaylessFacade.placeOrder(alice, new EspressoCreator());
 
@@ -518,7 +436,7 @@ class FacadeTest {
         @DisplayName("processOrder throws IllegalStateException when no gateway was ever configured")
         void processOrderThrowsWithoutGateway() {
             OrderService gatewayless = new OrderService();
-            CoffeeShopFacade gatewaylessFacade = new CoffeeShopFacade(gatewayless, buildChatService(gatewayless));
+            CoffeeShopFacade gatewaylessFacade = new CoffeeShopFacade(gatewayless);
             Order order = gatewaylessFacade.placeOrder(alice, new EspressoCreator());
 
             assertThrows(IllegalStateException.class, () -> gatewaylessFacade.processOrder(order));
@@ -528,7 +446,7 @@ class FacadeTest {
         @DisplayName("processOrder succeeds once setPaymentGateway configures one")
         void processOrderSucceedsAfterSetPaymentGateway() {
             OrderService gatewayless = new OrderService();
-            CoffeeShopFacade gatewaylessFacade = new CoffeeShopFacade(gatewayless, buildChatService(gatewayless));
+            CoffeeShopFacade gatewaylessFacade = new CoffeeShopFacade(gatewayless);
             Order order = gatewaylessFacade.placeOrder(alice, new EspressoCreator());
 
             gatewaylessFacade.setPaymentGateway(paymentGateway);

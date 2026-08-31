@@ -1,9 +1,9 @@
-package dev.saberlabs.framework.example.annotation;
+package dev.saberlabs.framework.annotation;
 
 /**
- * Pattern 11: REFLECTION FRAMEWORK — EXAMPLE (Request type)
+ * Pattern 11: REFLECTION FRAMEWORK (Request type)
  *
- * The set of request types the example framework knows how to route. Carried as the
+ * The set of request types the framework knows how to route. Carried as the
  * {@link RequestMappingMeta#value()} of a concrete handler annotation
  * ({@link OrderHandler}, {@link ChatHandler}) so routing is a real,
  * compiler-checked comparison instead of a string-matching convention.

@@ -1,20 +1,17 @@
-package dev.saberlabs.framework.example;
+package dev.saberlabs.framework;
 
-import dev.saberlabs.framework.example.annotation.ChatHandler;
-import dev.saberlabs.framework.example.annotation.OrderHandler;
-import dev.saberlabs.framework.example.reflection.InteractionHandler;
-
-import java.util.ArrayList;
-import java.util.List;
+import dev.saberlabs.framework.annotation.ChatHandler;
+import dev.saberlabs.framework.annotation.OrderHandler;
+import dev.saberlabs.framework.reflection.InteractionHandler;
 
 /**
- * Pattern 11: REFLECTION FRAMEWORK — EXAMPLE (Demo client)
+ * Pattern 11: REFLECTION FRAMEWORK (Demo client)
  * *
  * Standalone demo of the assignment's literal shape: a naive, string-typed request routed to
- * a {@code String}-only handler method purely through reflection. This is intentionally kept
- * separate from the real application — see {@code dev.saberlabs.framework.business} and
- * {@code CoffeeShopFacade} for the typed version {@code ChatService}/the CLI/FX apps actually
- * build on, and {@code framework/doc.md} for why the split exists.
+ * a {@code String}-only handler method purely through reflection, for two toy business types.
+ * The coffee shop's own {@code BusinessObject} is {@code dev.saberlabs.chat.CoffeeShopBusiness} —
+ * real order placement and real chat messages, not a toy demo; see its own test class rather
+ * than a third toy type here. See {@code framework/doc.md}.
  */
 public class BusinessTestClient {
     public static void main(String[] args) {
@@ -22,13 +19,10 @@ public class BusinessTestClient {
 
         BookStoreBusiness bookStore = new BookStoreBusiness();
         OnlineShopBusiness onlineShop = new OnlineShopBusiness();
-        CoffeeShopBusiness coffeeShop = new CoffeeShopBusiness();
 
-        // Demonstrate the CoffeeShopBusiness handling an order and a chat request
-        System.out.println("--- CoffeeShopBusiness Demo ---");
-        handler.handleInteraction(coffeeShop, "order", "Cappuccino");
-        handler.handleInteraction(coffeeShop, "chat", "Hello, coffee shop!");
-        handler.handleInteraction(coffeeShop, "feedback", "Great service!");
+        // The coffee shop's own BusinessObject is dev.saberlabs.chat.CoffeeShopBusiness — real
+        // order placement and real chat messages, not a toy List<String> stand-in like these two.
+        // See dev.saberlabs.chat.CoffeeShopBusinessTest for its coverage.
 
         // Demonstrate the BookStoreBusiness handling an order and a chat request
         System.out.println("--- BookStoreBusiness Demo ---");
@@ -43,42 +37,6 @@ public class BusinessTestClient {
         handler.handleInteraction(onlineShop, "order", "Laptop");
         handler.handleInteraction(onlineShop, "chat", "Hello, online shop!");
         handler.handleInteraction(onlineShop, "feedback", "Great service!");
-    }
-
-    public static class CoffeeShopBusiness implements BusinessObject {
-        List<String> orders = new ArrayList<>();
-        List<String> feedbacks = new ArrayList<>();
-        List<String> chats = new ArrayList<>();
-
-        private String sendFeedback(String feedback) {
-            feedbacks.add(feedback);
-            return "Feedback received: " + feedback;
-        }
-
-        private String placeOrder(String order) {
-            orders.add(order);
-            return "Order placed: " + order;
-        }
-
-        private String sendMessage(String message) {
-            chats.add(message);
-            return "Message sent: " + message;
-        }
-
-        @OrderHandler
-        public void handleOrder(String request) {
-            System.out.println("CoffeeShopBusiness handling order: " + placeOrder(request));
-        }
-
-        @ChatHandler
-        public void handleChat(String request) {
-            System.out.println("CoffeeShopBusiness handling chat: " + sendMessage(request));
-        }
-
-        @Override
-        public void processRequest(String request) {
-            System.out.println("CoffeeShopBusiness processing request: " + sendFeedback(request));
-        }
     }
 
     /**

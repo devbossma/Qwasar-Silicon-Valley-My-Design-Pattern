@@ -210,8 +210,8 @@
                                 <exclude>dev/saberlabs/CoffeeChatAppFX.class</exclude>
                                 <exclude>dev/saberlabs/views/**</exclude>
                                 <exclude>dev/saberlabs/fx/**</exclude>
-                                <exclude>dev/saberlabs/framework/example/BusinessTestClient.class</exclude>
-                                <exclude>dev/saberlabs/framework/example/BusinessTestClient$*.class</exclude>
+                                <exclude>dev/saberlabs/framework/BusinessTestClient.class</exclude>
+                                <exclude>dev/saberlabs/framework/BusinessTestClient$*.class</exclude>
                             </excludes>
                             <rules>
                                 <rule>

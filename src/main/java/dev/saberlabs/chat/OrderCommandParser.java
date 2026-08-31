@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Turns the tokens of an {@code order <coffee> [extras...]} chat command
+ * Turns the tokens of a {@code /order <coffee> [extras...]} chat command
  * into a decorated {@link Coffee}, or a reason it couldn't be built.
  * *
  * Pure parsing — no persistence, messaging, or session state. Split out of
@@ -48,7 +48,7 @@ public final class OrderCommandParser {
     public record UnknownExtras(@NotNull List<String> extras) implements Result {}
 
     /**
-     * @param commandParts the whitespace-split command, e.g. {@code ["order", "espresso", "milk"]}
+     * @param commandParts the whitespace-split command, e.g. {@code ["/order", "espresso", "milk"]}
      */
     public @NotNull Result parse(@NotNull String[] commandParts) {
         if (commandParts.length < 2) {

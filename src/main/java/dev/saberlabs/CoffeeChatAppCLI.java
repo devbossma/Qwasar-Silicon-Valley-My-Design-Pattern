@@ -80,10 +80,10 @@ public class CoffeeChatAppCLI {
                 baristaQueue,
                 orderService);
 
-        // CoffeeShopFacade composes the same OrderService (so its order API and the reflection
-        // framework's handleOrder share one Command/OrderInvoker pipeline) and this ChatService
-        // (for the framework's real handleChat) — the real BusinessObject for this app.
-        CoffeeShopFacade coffeeShopFacade = new CoffeeShopFacade(orderService, chatService);
+        // CoffeeShopFacade composes the same OrderService the reflection framework's real
+        // BusinessObject (dev.saberlabs.chat.CoffeeShopBusiness, owned by ChatService) also
+        // places orders through — one Command/OrderInvoker pipeline either way.
+        CoffeeShopFacade coffeeShopFacade = new CoffeeShopFacade(orderService);
 
         // ── 5. Open shop ─────────────────────────────────────────────
         coffeeShopFacade.open(QUEUE_CAPACITY, NUMBER_OF_BARISTAS);

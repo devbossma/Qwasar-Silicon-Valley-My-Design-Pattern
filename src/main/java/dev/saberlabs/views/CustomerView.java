@@ -145,7 +145,7 @@ public class CustomerView implements ChatObserver, NotificationObserver {
     private void printChatHelp() {
         System.out.println();
         System.out.println("  Commands:");
-        System.out.println("    order <coffee> [extras]   e.g. order cappuccino milk sugar");
+        System.out.println("    /order <coffee> [extras]  e.g. /order cappuccino milk sugar");
         System.out.println("    pay                       pay for a READY order");
         System.out.println("    history                   show this session's messages");
         System.out.println("    back                      return to menu (session stays open)");

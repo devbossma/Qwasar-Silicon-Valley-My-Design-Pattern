@@ -5,6 +5,7 @@ import dev.saberlabs.auth.User;
 import dev.saberlabs.chat.repositories.ChatOrderRepository;
 import dev.saberlabs.chat.repositories.ChatRepository;
 import dev.saberlabs.chat.repositories.ChatSessionRepository;
+import dev.saberlabs.framework.reflection.InteractionHandler;
 import dev.saberlabs.models.Coffee;
 import dev.saberlabs.models.Customer;
 import dev.saberlabs.models.Order;
@@ -32,15 +33,21 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * as any other order placed through {@code OrderService} — not a parallel, chat-only code path.
  * <p>
  * This class depends on {@link OrderService} directly, not on
- * {@code dev.saberlabs.facade.CoffeeShopFacade} — the Facade composes this class (for the
- * reflection framework's real {@code handleChat}), so the dependency runs one direction only.
- * There's no reflection in this class's own methods: reflective dispatch doesn't reduce this
- * class's work, it only adds indirection, so real chat/order traffic calls {@code OrderService}
- * directly. See {@code framework/doc.md}.
+ * {@code dev.saberlabs.facade.CoffeeShopFacade}. Order placement/kitchen routing themselves
+ * never go through reflection: by the time this class calls {@code OrderService}, it already
+ * knows exactly which method it needs, so reflective dispatch there would only add indirection.
+ * <p>
+ * <b>Where reflection genuinely earns its keep here:</b> a customer's raw chat input is the one
+ * case where the caller does <i>not</i> already know what it's holding — plain small talk, or an
+ * order command, arrive as the same {@code String}. {@link #processCustomerInput} hands that raw
+ * text to {@link InteractionHandler}, which decides only whether it starts with the {@code
+ * "/order"} marker or not, then dispatches to {@code dev.saberlabs.chat.CoffeeShopBusiness} — the
+ * one real {@code BusinessObject} for this application. Everything past that one decision (the
+ * coffee-specific parsing, placing the order, sending the reply) is ordinary business logic in
+ * this class, invoked through {@code CoffeeShopBusiness}'s annotated handler methods, not
+ * framework machinery. See {@code framework/doc.md}.
  */
 public class ChatService {
-
-    private static final String ORDER_COMMAND = "order";
 
     @NotNull private final ChatRepository chatRepository;
     @NotNull private final ChatSessionRepository sessionRepository;
@@ -219,6 +226,22 @@ public class ChatService {
                 MessageType.CHAT_MESSAGE, null);
     }
 
+    /**
+     * Classifies and handles a customer's raw chat input — plain small talk, or an order
+     * command, arrive as the same {@code String}. The classification itself (does it start with
+     * "order"?) is delegated to {@link InteractionHandler}, which then dispatches to a
+     * fresh, request-scoped {@code CoffeeShopBusiness} — the one real {@code BusinessObject}
+     * for this application. Its annotated handler methods call straight back into this class's
+     * own {@link #handleOrderCommand}/{@link #sendMessage}, so the actual work (coffee parsing,
+     * persistence, replies) stays here; the framework's only contribution is the one yes/no
+     * decision.
+     *
+     * @param user    the customer sending the input
+     * @param session the active chat session
+     * @param input   the raw text the customer typed
+     * @return the resulting {@link ChatMessage} (a confirmation/error SYSTEM_MESSAGE for an
+     *         order command, or the sent CHAT_MESSAGE otherwise)
+     */
     public @NotNull ChatMessage processCustomerInput(@NotNull User user,
                                                      @NotNull ChatSession session,
                                                      @NotNull String input) {
@@ -226,24 +249,19 @@ public class ChatService {
         Objects.requireNonNull(session, "Session cannot be null");
         Objects.requireNonNull(input, "Input cannot be null");
 
-        String trimmed = input.trim();
-        if (trimmed.toLowerCase(Locale.ROOT).startsWith(ORDER_COMMAND)) {
-
-            return handleOrderCommand(user, session, trimmed);
-        }
-        return sendMessage(session.id(), user.id(), user.username(), trimmed);
+        CoffeeShopBusiness business = new CoffeeShopBusiness(this, user, session);
+        new InteractionHandler().handleInteraction(business, input.trim());
+        return business.result();
     }
-
-
 
     // ================================================================
     // Order command handling — parsing is delegated to OrderCommandParser;
     // this stays responsible for persisting the order and messaging both parties
     // ================================================================
 
-    private @NotNull ChatMessage handleOrderCommand(@NotNull User user,
-                                                    @NotNull ChatSession session,
-                                                    @NotNull String input) {
+    @NotNull ChatMessage handleOrderCommand(@NotNull User user,
+                                            @NotNull ChatSession session,
+                                            @NotNull String input) {
         // Customer's own typed command — CHAT_MESSAGE
         sendMessage(session.id(), user.id(), user.username(), input);
 
@@ -252,7 +270,7 @@ public class ChatService {
 
         return switch (result) {
             case OrderCommandParser.MissingCoffeeType ignored -> sendSystemMessage(session.id(),
-                    "Please specify a coffee type. Example: order espresso milk");
+                    "Please specify a coffee type. Example: /order espresso milk");
 
             case OrderCommandParser.UnknownCoffeeType(String coffeeType) -> sendSystemMessage(session.id(),
                     "Unknown coffee type: " + coffeeType + ". Available: "

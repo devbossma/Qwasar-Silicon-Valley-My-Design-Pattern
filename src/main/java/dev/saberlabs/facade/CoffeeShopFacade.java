@@ -1,23 +1,13 @@
 package dev.saberlabs.facade;
 
 import dev.saberlabs.adapter.PaymentGateway;
-import dev.saberlabs.chat.ChatMessage;
-import dev.saberlabs.chat.ChatService;
 import dev.saberlabs.command.OrderInvoker;
 import dev.saberlabs.factory.CoffeeCreator;
-import dev.saberlabs.framework.business.BusinessObject;
-import dev.saberlabs.framework.business.ChatDetails;
-import dev.saberlabs.framework.business.FeedbackDetails;
-import dev.saberlabs.framework.business.OrderDetails;
-import dev.saberlabs.framework.business.RequestType;
-import dev.saberlabs.framework.business.annotation.ChatHandler;
-import dev.saberlabs.framework.business.annotation.OrderHandler;
 import dev.saberlabs.models.*;
 import dev.saberlabs.observer.OrderObserver;
 import dev.saberlabs.order.OrderService;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -44,20 +34,16 @@ import java.util.Objects;
  * order logic itself, it delegates every order-related call to a single {@code OrderService}
  * instance. That keeps this Facade doing exactly what a Facade is for (a simple, unified
  * entry point), while the real application/service logic lives in one reusable place.
- *
- * <h3>The reflection framework's real BusinessObject</h3>
- * This class also composes a {@link ChatService} and implements
- * {@link dev.saberlabs.framework.business.BusinessObject} — its {@link #handleOrder} and
- * {@link #handleChat} methods delegate to the exact same {@code OrderService}/{@code ChatService}
- * this class already uses for its normal API, so reflective dispatch reaches real business
- * logic, not a stand-in. Deliberately NOT wired here: the live application's own order/chat
- * traffic ({@code ChatService}'s own methods) does not route through reflection — see
- * {@code framework/doc.md} for why forcing that would only add indirection without reducing
- * anyone's work, which is not what a real framework would do.
+ * <p>
+ * This class does not implement {@code dev.saberlabs.framework.BusinessObject} — the
+ * reflection framework's one real business object is {@code dev.saberlabs.chat.CoffeeShopBusiness},
+ * scoped to a single chat request's identity. A {@code BusinessObject} stands for one whole
+ * business, so this app has exactly one, not one per class that happens to touch order/chat
+ * data; see {@code framework/doc.md}.
  *
  * <h3>Usage</h3>
  * <pre>
- *     CoffeeShopFacade facade = new CoffeeShopFacade(orderService, chatService);
+ *     CoffeeShopFacade facade = new CoffeeShopFacade(orderService);
  *     facade.registerCustomer(customer);
  *
  *     Order order = facade.placeOrder(customer, new EspressoCreator(), "milk", "sugar");
@@ -66,19 +52,15 @@ import java.util.Objects;
  *     facade.reorderForAnotherCustomer(order, anotherCustomer);
  * </pre>
  */
-public class CoffeeShopFacade implements BusinessObject {
+public class CoffeeShopFacade {
 
     private final OrderService orderService;
-    private final ChatService chatService;
-    private final List<String> feedbackLog = new ArrayList<>();
 
     /**
      * @param orderService the real order lifecycle this facade delegates its order API to
-     * @param chatService  the real chat service {@link #handleChat} delegates to
      */
-    public CoffeeShopFacade(@NotNull OrderService orderService, @NotNull ChatService chatService) {
+    public CoffeeShopFacade(@NotNull OrderService orderService) {
         this.orderService = Objects.requireNonNull(orderService, "Order service cannot be null");
-        this.chatService = Objects.requireNonNull(chatService, "Chat service cannot be null");
     }
 
     // ================================================================
@@ -219,63 +201,6 @@ public class CoffeeShopFacade implements BusinessObject {
 
     public void setPaymentGateway(@NotNull PaymentGateway paymentGateway) {
         orderService.setPaymentGateway(paymentGateway);
-    }
-
-    // ================================================================
-    // Reflection Framework (BusinessObject) — see dev.saberlabs.framework.business
-    // ================================================================
-
-    /**
-     * The {@link BusinessObject} default/fallback handler — invoked whenever a request has no
-     * dedicated {@link OrderHandler}/{@link ChatHandler}-style annotated method, such as
-     * {@link FeedbackDetails}. There's no dedicated "feedback" subsystem in this app, so
-     * recording the raw text here for a human to review later is genuine behavior, not a
-     * stand-in for a missing one; see {@link #getFeedbackLog()}.
-     *
-     * @param request the request with no dedicated handler
-     */
-    @Override
-    public void processRequest(RequestType request) {
-        Objects.requireNonNull(request, "Request cannot be null");
-        if (request instanceof FeedbackDetails feedback) {
-            feedbackLog.add(feedback.text());
-        }
-    }
-
-    /**
-     * Places the given, already-built order through the exact same {@link OrderService} every
-     * other caller of this facade uses — reflective dispatch reaches real placement logic, not
-     * a demo stand-in.
-     *
-     * @param details the order to place
-     * @return the placed order
-     */
-    @OrderHandler
-    public @NotNull Order handleOrder(@NotNull OrderDetails details) {
-        Objects.requireNonNull(details, "Order details cannot be null");
-        return orderService.placeOrder(details.order());
-    }
-
-    /**
-     * Sends the given chat message through the real {@link ChatService} this facade composes.
-     *
-     * @param details the chat message to send
-     * @return the saved, real {@link ChatMessage}
-     */
-    @ChatHandler
-    public @NotNull ChatMessage handleChat(@NotNull ChatDetails details) {
-        Objects.requireNonNull(details, "Chat details cannot be null");
-        return chatService.sendMessage(details.sessionId(), details.senderId(),
-                details.senderName(), details.content());
-    }
-
-    /**
-     * Returns the request texts recorded via the {@link #processRequest(RequestType)} fallback.
-     *
-     * @return an unmodifiable snapshot of the feedback log
-     */
-    public @NotNull List<String> getFeedbackLog() {
-        return List.copyOf(feedbackLog);
     }
 
     // ================================================================

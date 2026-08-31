@@ -280,7 +280,7 @@ class ChatServiceTest {
         void missingCoffeeTypeReturnsSystemError() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage result = chatService.processCustomerInput(
-                    aliceUser, session, "order");
+                    aliceUser, session, "/order");
             assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
             assertTrue(result.content().contains("specify a coffee type"));
         }
@@ -290,7 +290,7 @@ class ChatServiceTest {
         void unknownCoffeeReturnsSystemError() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage result = chatService.processCustomerInput(
-                    aliceUser, session, "order unicornlatte");
+                    aliceUser, session, "/order unicornlatte");
             assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
             assertTrue(result.content().contains("Unknown coffee type"));
         }
@@ -300,7 +300,7 @@ class ChatServiceTest {
         void unknownExtraReturnsSystemError() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage result = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso glitter");
+                    aliceUser, session, "/order espresso glitter");
             assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
             assertTrue(result.content().contains("Unknown extra"));
         }
@@ -310,7 +310,7 @@ class ChatServiceTest {
         void validOrderCommandPersistsStoredOrder() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage result = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso milk");
+                    aliceUser, session, "/order espresso milk");
 
             assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
             assertNotNull(result.orderId());
@@ -326,11 +326,11 @@ class ChatServiceTest {
         }
 
         @Test
-        @DisplayName("order command with 'sugar' applies the SugarDecorator")
+        @DisplayName("/order command with 'sugar' applies the SugarDecorator")
         void validOrderCommandWithSugar() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage result = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso sugar");
+                    aliceUser, session, "/order espresso sugar");
 
             assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
             assertNotNull(result.orderId());
@@ -338,17 +338,18 @@ class ChatServiceTest {
         }
 
         @Test
-        @DisplayName("order command with 'whipped' applies the WhippedCreamDecorator")
+        @DisplayName("/order command with 'whipped' applies the WhippedCreamDecorator")
         void validOrderCommandWithWhippedCream() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage result = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso whipped");
+                    aliceUser, session, "/order espresso whipped");
 
             assertEquals(MessageType.SYSTEM_MESSAGE, result.type());
             assertNotNull(result.orderId());
             assertTrue(result.content().contains("Whipped Cream"));
         }
     }
+
 
     // ================================================================
     // getPendingOrdersForSession()
@@ -362,8 +363,8 @@ class ChatServiceTest {
         @DisplayName("returns only PLACED orders for the session's customer")
         void returnsOnlyPlacedOrders() {
             ChatSession session = chatService.startChat(aliceUser);
-            chatService.processCustomerInput(aliceUser, session, "order espresso");
-            chatService.processCustomerInput(aliceUser, session, "order latte");
+            chatService.processCustomerInput(aliceUser, session, "/order espresso");
+            chatService.processCustomerInput(aliceUser, session, "/order latte");
 
             List<StoredOrder> pending = chatService.getPendingOrdersForSession(session);
             assertEquals(2, pending.size());
@@ -390,7 +391,7 @@ class ChatServiceTest {
         void updatesToPreparingAndEnqueues() throws InterruptedException {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
 
             chatService.sendOrderToKitchen(session, baristaUser.id(), placed.orderId());
 
@@ -416,7 +417,7 @@ class ChatServiceTest {
         void systemMessageWhenShopNotOpen() throws InterruptedException {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
 
             shop.close(); // clears the OrderQueue, as if the shop never opened
 
@@ -441,7 +442,7 @@ class ChatServiceTest {
         void failsWhenOrderNotReady() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
 
             PaymentGateway gateway = buildCashGateway(10.00);
             assertNotNull(placed.orderId());
@@ -468,7 +469,7 @@ class ChatServiceTest {
         void succeedsWhenReadyAndPaymentSucceeds() throws InterruptedException {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
 
             chatService.sendOrderToKitchen(session, baristaUser.id(), placed.orderId());
 
@@ -497,7 +498,7 @@ class ChatServiceTest {
         void failsWhenGatewayDeclines() throws InterruptedException {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
 
             assertNotNull(placed.orderId());
             chatService.sendOrderToKitchen(session, baristaUser.id(), placed.orderId());
@@ -523,7 +524,7 @@ class ChatServiceTest {
             // when it falls back to the customer notification's default id.
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
 
             var liveOrder = shop.getOrders().stream()
                     .filter(o -> o.getOrderId().equals(placed.orderId()))
@@ -552,7 +553,7 @@ class ChatServiceTest {
         void callsGatewayAndFulfillsOnSuccess() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
             // Deliberately not routed through sendOrderToKitchen() -- that hands the
             // order to the real background Barista thread, which would race this
             // test's manual setStatus(READY) below. The mock isolates us from that.
@@ -579,7 +580,7 @@ class ChatServiceTest {
         void leavesOrderReadyWhenGatewayDeclines() {
             ChatSession session = chatService.startChat(aliceUser);
             ChatMessage placed = chatService.processCustomerInput(
-                    aliceUser, session, "order espresso");
+                    aliceUser, session, "/order espresso");
             // Same reasoning as above: skip sendOrderToKitchen() to avoid racing
             // the real background Barista thread.
 
@@ -612,8 +613,8 @@ class ChatServiceTest {
         @DisplayName("getOrderHistory returns only the given user's orders")
         void getOrderHistoryFiltersCorrectly() {
             ChatSession session = chatService.startChat(aliceUser);
-            chatService.processCustomerInput(aliceUser, session, "order espresso");
-            chatService.processCustomerInput(aliceUser, session, "order latte");
+            chatService.processCustomerInput(aliceUser, session, "/order espresso");
+            chatService.processCustomerInput(aliceUser, session, "/order latte");
 
             List<StoredOrder> history = chatService.getOrderHistory(aliceUser);
             assertEquals(2, history.size());
@@ -623,7 +624,7 @@ class ChatServiceTest {
         @DisplayName("getAllOrders returns every order across all customers")
         void getAllOrdersReturnsEverything() {
             ChatSession session = chatService.startChat(aliceUser);
-            chatService.processCustomerInput(aliceUser, session, "order espresso");
+            chatService.processCustomerInput(aliceUser, session, "/order espresso");
 
             assertFalse(chatService.getAllOrders().isEmpty());
         }
@@ -734,7 +735,7 @@ class ChatServiceTest {
         @DisplayName("returns only the given customer's live orders")
         void returnsLiveOrdersForCustomer() {
             ChatSession session = chatService.startChat(aliceUser);
-            chatService.processCustomerInput(aliceUser, session, "order espresso");
+            chatService.processCustomerInput(aliceUser, session, "/order espresso");
 
             var orders = chatService.getCoffeeShopOrdersForCustomer(aliceUser.id());
 

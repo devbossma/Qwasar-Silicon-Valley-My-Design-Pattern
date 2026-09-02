@@ -112,6 +112,43 @@ class InteractionHandlerTest {
         }
     }
 
+    @Nested
+    @DisplayName("caching the resolved handler methods per business object class")
+    class CachingTests {
+
+        @Test
+        @DisplayName("two different BusinessObject classes route correctly when dispatched to "
+                + "interleaved, proving the shared per-class cache doesn't cross-contaminate")
+        void differentClassesDontShareCachedHandlers() {
+            RecordingBusinessObject first = new RecordingBusinessObject();
+            OtherRecordingBusinessObject second = new OtherRecordingBusinessObject();
+
+            handler.handleInteraction(first, "order", "first order");
+            handler.handleInteraction(second, "order", "second order");
+            handler.handleInteraction(first, "chat", "first chat");
+            handler.handleInteraction(second, "chat", "second chat");
+
+            assertEquals(List.of("first order"), first.orderCalls);
+            assertEquals(List.of("first chat"), first.chatCalls);
+            assertEquals(List.of("second order"), second.orderCalls);
+            assertEquals(List.of("second chat"), second.chatCalls);
+        }
+
+        @Test
+        @DisplayName("repeated dispatch to the same class keeps working after the first call "
+                + "populates the cache")
+        void repeatedDispatchToSameClassStaysCorrect() {
+            RecordingBusinessObject target = new RecordingBusinessObject();
+
+            handler.handleInteraction(target, "order", "one");
+            handler.handleInteraction(target, "order", "two");
+            handler.handleInteraction(target, "chat", "three");
+
+            assertEquals(List.of("one", "two"), target.orderCalls);
+            assertEquals(List.of("three"), target.chatCalls);
+        }
+    }
+
     /**
      * A minimal, self-contained BusinessObject test double. Reflection needs real
      * annotated methods to find, so a Mockito mock (which has no real annotations
@@ -134,6 +171,31 @@ class InteractionHandlerTest {
 
         @ChatHandler
         public void handleChat(String message) {
+            chatCalls.add(message);
+        }
+    }
+
+    /**
+     * A second, distinct BusinessObject implementation with differently-named handler methods,
+     * used only to prove the per-class handler cache in {@link InteractionHandler} keys correctly
+     * by class and never routes one class's request to another class's method.
+     */
+    static class OtherRecordingBusinessObject implements BusinessObject {
+        final List<String> orderCalls = new ArrayList<>();
+        final List<String> chatCalls = new ArrayList<>();
+
+        @Override
+        public void processRequest(String request) {
+            // not exercised by these tests
+        }
+
+        @OrderHandler
+        public void takeOrder(String orderDetails) {
+            orderCalls.add(orderDetails);
+        }
+
+        @ChatHandler
+        public void takeChat(String message) {
             chatCalls.add(message);
         }
     }

@@ -6,8 +6,11 @@ import dev.saberlabs.framework.annotation.RequestType;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.EnumMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Pattern 11: REFLECTION FRAMEWORK (Dispatcher)
@@ -18,6 +21,14 @@ import java.util.Objects;
  * type string doesn't resolve to a known {@link RequestType}, or no method claims the resolved
  * type, dispatch falls back to {@link BusinessObject#processRequest(String)} — the default
  * handler every business object must provide.
+ * <p>
+ * The {@code Class -> RequestType -> Method} mapping is resolved once per business object
+ * <em>class</em> (not per instance, and not per call) and cached, since annotations are static
+ * metadata that can never change for a given class at runtime. Every request after the first one
+ * for a given class is a plain map lookup instead of a fresh {@code getMethods()} scan — real
+ * chat traffic runs this dispatcher for every customer keystroke, so re-scanning on every single
+ * call would be wasted work. This is the same lookup-cache shape real dispatch frameworks use
+ * (e.g. Spring MVC's handler mapping cache).
  * <p>
  * Note this is a caller-invoked dispatcher, not an inversion-of-control framework: application
  * code decides when to call {@link #handleInteraction}, rather than this class owning an entry
@@ -30,6 +41,15 @@ import java.util.Objects;
 public class InteractionHandler {
 
     private static final String ORDER_MARKER = "/order";
+
+    /**
+     * One resolved handler-method map per business object class, built the first time that class
+     * is dispatched to and reused for every request after that. Shared across all
+     * {@code InteractionHandler} instances (there's no per-instance state to key it by, and the
+     * result only ever depends on the class), and safe under concurrent access since it's built
+     * from immutable reflection metadata.
+     */
+    private static final Map<Class<?>, Map<RequestType, Method>> HANDLER_CACHE = new ConcurrentHashMap<>();
 
     /**
      * Classifies the raw request text — the only judgment call this framework makes on the
@@ -98,17 +118,36 @@ public class InteractionHandler {
             return;
         }
 
-        for (Method method : businessObject.getClass().getMethods()) {
+        Method method = HANDLER_CACHE
+                .computeIfAbsent(businessObject.getClass(), InteractionHandler::resolveHandlers)
+                .get(type);
+
+        if (method != null) {
+            ReflectionUtil.invokeMethod(businessObject, method.getName(), request);
+            return;
+        }
+
+        // No method was found for the request type -> fall back to the default handler.
+        businessObject.processRequest(request);
+    }
+
+    /**
+     * Scans every public method on {@code businessObjectClass} once and builds the complete
+     * {@link RequestType} -> {@link Method} map for it, so {@link #handleInteraction} never has
+     * to walk {@code getMethods()} again for that class. When two methods claim the same
+     * {@link RequestType}, the first one {@code getMethods()} returns wins, keeping this the same
+     * "first match" behavior the uncached, per-call scan used to have.
+     */
+    private static Map<RequestType, Method> resolveHandlers(Class<?> businessObjectClass) {
+        Map<RequestType, Method> handlers = new EnumMap<>(RequestType.class);
+        for (Method method : businessObjectClass.getMethods()) {
             for (Annotation annotation : method.getAnnotations()) {
                 RequestMappingMeta meta = annotation.annotationType().getAnnotation(RequestMappingMeta.class);
-                if (meta != null && meta.value() == type) {
-                    ReflectionUtil.invokeMethod(businessObject, method.getName(), request);
-                    return;
+                if (meta != null) {
+                    handlers.putIfAbsent(meta.value(), method);
                 }
             }
         }
-
-        // If no method was found for the request type, fall back to the default handler.
-        businessObject.processRequest(request);
+        return handlers;
     }
 }

@@ -66,9 +66,8 @@ assignment's own demo makes this explicit (`BookStoreBusiness`, `OnlineShopBusin
               └─ delegates to the 3-arg overload below
         + handleInteraction(BusinessObject, requestType, request)
               └─ resolves requestType -> RequestType (or falls back on failure)
-              └─ reflects over businessObject.getClass().getMethods()
-              └─ matches a method whose annotation is meta-annotated
-                 @RequestMappingMeta and whose value() == the resolved RequestType
+              └─ looks up businessObject's class in a cached RequestType->Method map
+                 (built once per class, from a getMethods() scan, then reused)
               └─ delegates the actual call to ReflectionUtil.invokeMethod(...)
               └─ no match at any stage -> businessObject.processRequest(request)
 
@@ -194,6 +193,43 @@ public void processRequest(String request) {
 valid choice too, a business is free to just ignore a command it doesn't recognize instead of
 replying to it. `CoffeeShopBusiness` replying is a real design choice, not something the framework
 requires.
+
+### Caching the reflective lookup
+
+The first version of `InteractionHandler` called `businessObject.getClass().getMethods()` and
+scanned every method's annotations on every single call. That's fine for a demo, but it's real
+waste in the live app: `handleInteraction` runs for every customer keystroke that reaches
+`ChatService.processCustomerInput`, and a `BusinessObject`'s annotations never change once the
+class is loaded, so re-scanning the same class over and over buys nothing.
+
+`InteractionHandler` now keeps a static `Map<Class<?>, Map<RequestType, Method>>` cache. The first
+time a given business object class is dispatched to, it builds the full `RequestType -> Method`
+map for that class once and stores it; every call after that (for any instance of that class) is a
+plain map lookup instead of a fresh reflection scan:
+
+```java
+private static final Map<Class<?>, Map<RequestType, Method>> HANDLER_CACHE = new ConcurrentHashMap<>();
+
+Method method = HANDLER_CACHE
+        .computeIfAbsent(businessObject.getClass(), InteractionHandler::resolveHandlers)
+        .get(type);
+```
+
+The cache is keyed by `Class`, not by instance or by `InteractionHandler` instance, because the
+result only depends on the class's annotations. `ConcurrentHashMap` makes concurrent access safe
+without extra locking, which matters here since chat requests can be handled by multiple threads.
+This is the same shape real dispatch frameworks use for their handler-mapping caches (Spring MVC's
+`RequestMappingHandlerMapping`, for one).
+
+### Known limitation: handler methods must take a single `String`
+
+`ReflectionUtil.invokeMethod` always looks up a method by `(String.class)` and invokes it with one
+`String` argument. That matches every handler in this assignment (`handleOrder(String)`,
+`handleChat(String)`, `processRequest(String)`), and it keeps the dispatcher simple. It does mean
+a handler can't take a typed payload (an already-parsed `Order`, say) — if this framework ever grew
+past plain chat text, `ReflectionUtil` and the annotations would need to carry the parameter type
+too, not just the request type. Not needed for what this app actually does today, so it's left as
+a documented constraint rather than solved speculatively.
 
 ### Failures propagate, they aren't swallowed
 
